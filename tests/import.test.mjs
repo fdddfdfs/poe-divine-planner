@@ -55,15 +55,37 @@ test('target changes re-evaluate copied values including lower-is-better',()=>{
 });
 test('plain copy, unsupported items and ambiguous/scaled ranges fail explicitly',()=>{
   assert.throws(()=>parseItem(item('+104 to maximum Life')),/advanced/i);
-  for(const flag of ['Corrupted','Mirrored','Fractured Item','Unmodifiable','Unidentified'])assert.throws(()=>parseItem(EXAMPLE_ITEM+'\n--------\n'+flag),/outside/);
+  assert.throws(()=>parseItem(EXAMPLE_ITEM+'\n--------\nUnidentified'),/outside/);
+  assert.throws(()=>parseItem(EXAMPLE_ITEM+'\n--------\nFractured Item'),/no modifier is marked/);
   assert.throws(()=>parseItem(EXAMPLE_ITEM.replace('Rarity: Rare','Rarity: Unique')),/rare equipment/i);
   assert.throws(()=>parseItem(EXAMPLE_ITEM.replace('Item Class: Body Armours','Item Class: Maps')),/rare equipment/i);
   assert.throws(()=>parseItem(EXAMPLE_ITEM.replace('Armour: 1250','Quality (Life and Mana Modifiers): +20%')),/Catalyst/);
   assert.throws(()=>parseItem(item('{ Prefix Modifier "X" }\n120(100-109) to maximum Life')),/outside its raw range/);
   assert.throws(()=>parseItem(item('{ Prefix Modifier "X" }\n+(100-109) to maximum Life')),/current value/);
-  assert.throws(()=>parseItem(item('{ Prefix Modifier "X" }\n10(1-10)% increased Damage (fractured)')),/outside/);
+  assert.equal(parseItem(item('{ Prefix Modifier "X" }\n10(1-10)% increased Damage (fractured)')).banks.prefix.mods[0].fractured,true);
   assert.throws(()=>parseItem(item('{ Master Crafted Suffix Modifier "Meta" }\n1 Prefix Modifier cannot be changed (crafted)')),/metacraft/);
   assert.throws(()=>parseItem(EXAMPLE_ITEM+'\n'+EXAMPLE_ITEM),/one complete item/);
+});
+test('fractured hybrid stays fixed below maximum and remains an occupied affix',()=>{
+  const text=EXAMPLE_ITEM.replace('39(39-42)% increased Armour','39(39-42)% increased Armour (fractured)')+'\n--------\nFractured Item';
+  const parsed=parseItem(text), mod=parsed.banks.prefix.mods[2];
+  assert.equal(mod.fractured,true);assert.equal(mod.hit,true);assert.equal(atTarget(mod),true);
+  assert.deepEqual(mod.rolls.map(r=>r.current),[39,16]);
+  assert.deepEqual(mod.rolls.map(r=>r.target),[39,16]);
+  assert.equal(probabilities(parsed.banks.prefix.mods)[2],1);
+  assert.equal(parsed.banks.suffix.canCraft,false,'Three occupied prefixes still prevent a suffix lock');
+});
+test('fracture headers work and item mutability flags are ignored for planning',()=>{
+  const text=item('{ Fractured Prefix Modifier "Fixed" }\n5(1-10)% increased Damage')+'\n--------\nCorrupted\nMirrored\nUnmodifiable';
+  const parsed=parseItem(text);
+  assert.equal(parsed.banks.prefix.mods[0].fractured,true);
+  assert.deepEqual(parsed.itemFlags,['Corrupted','Mirrored','Unmodifiable']);
+  assert.equal(parsed.banks.prefix.canCraft,true);
+  for(const flag of parsed.itemFlags){
+    const p=parseItem(EXAMPLE_ITEM+'\n--------\n'+flag);
+    assert.deepEqual(probabilities(p.banks.prefix.mods),probabilities(parseItem(EXAMPLE_ITEM).banks.prefix.mods));
+    assert.equal(p.banks.prefix.canCraft,true);
+  }
 });
 test('more than three same-side modifiers is rejected rather than truncated',()=>{
   const lines=Array.from({length:4},(_,i)=>`{ Prefix Modifier "Test${i}" }\n10(1-10)% increased Damage`).join('\n');

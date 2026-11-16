@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {rollProbability, probabilities, transition, calculate} from '../dist/engine.js';
+import {rollProbability, probabilities, transition, calculate, fractureMask} from '../dist/engine.js';
 const close = (a,b,t=1e-8) => assert.ok(Math.abs(a-b)<=t*Math.max(1,Math.abs(b)),`${a} != ${b}`);
 test('inclusive, decimal, reversed-desirability and exact targets',()=>{
   close(rollProbability({min:100,max:109,step:1,target:109,direction:'atLeast'}),.1);
@@ -52,8 +52,35 @@ test('reject impossible or numerically unreliable inputs',()=>{
   assert.throws(()=>calculate([.5,.5],{one:-1}));
   assert.throws(()=>calculate([.5,.5],{specific:2}));
 });
+test('fractures contribute no divine requirement, including an all-fractured side',()=>{
+  const mods=[{fractured:true,rolls:[{min:1,max:10,step:1,target:10,direction:'atLeast',current:2}]},{rolls:[{min:1,max:5,step:1,target:5,direction:'atLeast'}]}];
+  assert.deepEqual(probabilities(mods),[1,.2]);assert.equal(fractureMask(mods),1);
+  close(calculate(probabilities(mods),{fracturedMask:1}).results[0].rolls,5);
+  for(const result of calculate([.01,.1,.2],{fracturedMask:7}).results){close(result.rolls,0);close(result.cost,0);}
+  close(calculate([.000001,.000001,.1],{fracturedMask:3}).results[0].rolls,10);
+  assert.throws(()=>calculate([.5],{fracturedMask:2}),/mask/);
+});
+test('fractures never change but remain eligible for random partial locks',()=>{
+  const next=transition([1,.2],1,1,1);
+  close(next[0],0);close(next[2],0);
+  close(next[3],.1); // The lock protects the fracture half the time.
+  close(next[1],.9);
+  for(let mask=0;mask<8;mask++)for(let k=0;k<3;k++){
+    const p=transition([1,.2,.3],mask,k,1);
+    close(p.reduce((a,b)=>a+b,0),1);
+    close(p.filter((_,i)=>!(i&1)).reduce((a,b)=>a+b,0),0);
+  }
+});
+test('target-count and specific strategies do not lock merely because a fracture is fixed',()=>{
+  const result=calculate([1,.2,.3],{fracturedMask:1,specific:0,initialMask:1});
+  assert.equal(result.results[1].next,0);
+  assert.equal(result.results[2].next,0);
+  const oneHit=calculate([1,.2,.3],{fracturedMask:1,specific:1,initialMask:3});
+  assert.equal(oneHit.results[2].next,1);
+});
 test('independent seeded Monte Carlo agrees with all four policy expectations',()=>{
-  const ps=[.25,.5,.2], config={one:1,two:2,removal:.1,specific:2};
+  for (const fracturedMask of [0,1]) {
+  const ps=[.25,.5,.2], config={one:1,two:2,removal:.1,specific:2,fracturedMask};
   const expected=calculate(ps,config);
   let seed=4201;
   const rng=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -61,7 +88,7 @@ test('independent seeded Monte Carlo agrees with all four policy expectations',(
   for(const result of expected.results){
     let total=0,rolls=0;
     for(let trial=0;trial<trials;trial++){
-      let mask=0,craft=0,cost=0,count=0;
+      let mask=fracturedMask,craft=0,cost=0,count=0;
       while(mask!==7){
         const a=result.policy[mask*3+craft];
         if(a!==craft){if(craft)cost+=config.removal;cost+=[0,config.one,config.two][a];}
@@ -69,7 +96,7 @@ test('independent seeded Monte Carlo agrees with all four policy expectations',(
         const indices=[0,1,2];
         for(let i=2;i>0;i--){const j=Math.floor(rng()*(i+1));[indices[i],indices[j]]=[indices[j],indices[i]];}
         const locked=indices.slice(0,craft);
-        for(let i=0;i<3;i++)if(!locked.includes(i)){
+        for(let i=0;i<3;i++)if(!(fracturedMask&(1<<i)) && !locked.includes(i)){
           if(rng()<ps[i])mask|=1<<i;else mask&=~(1<<i);
         }
         assert.ok(count<100000,'Simulation should terminate');
@@ -78,5 +105,6 @@ test('independent seeded Monte Carlo agrees with all four policy expectations',(
       total+=cost;rolls+=count;
     }
     close(total/trials,result.cost,.025);close(rolls/trials,result.rolls,.025);
+  }
   }
 });

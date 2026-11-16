@@ -1,4 +1,4 @@
-import { probabilities, calculate } from './engine.js';
+import { probabilities, calculate, fractureMask } from './engine.js';
 import { parseItem, atTarget, EXAMPLE_ITEM } from './import.js';
 const $ = id => document.getElementById(id);
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,6 +15,8 @@ function validState(s) {
   if (!s || s.v !== 1 || !['prefix','suffix'].includes(s.side)) throw new Error('Unsupported setup.');
   probabilities(s.mods);
   for (const m of s.mods) if (typeof m.name !== 'string' || m.name.length > 120 || typeof m.hit !== 'boolean') throw new Error('Invalid modifier.');
+  for (const m of s.mods) if (m.fractured !== undefined && typeof m.fractured !== 'boolean') throw new Error('Invalid fracture state.');
+  if (s.itemFlags && (!Array.isArray(s.itemFlags) || s.itemFlags.length > 3 || s.itemFlags.some(f => typeof f !== 'string' || !/^(Corrupted|Mirrored|Unmodifiable)$/i.test(f)))) throw new Error('Invalid item flags.');
   if (s.canCraft !== undefined && typeof s.canCraft !== 'boolean') throw new Error('Invalid crafting availability.');
   if (s.banks) {
     for (const side of ['prefix','suffix']) {
@@ -23,7 +25,7 @@ function validState(s) {
       if (bank.mods.length) validState({v:1,side,...bank});
     }
   }
-  calculate(probabilities(s.mods), {...s, initialMask:0});
+  calculate(probabilities(s.mods), {...s, initialMask:0, fracturedMask:fractureMask(s.mods)});
   return s;
 }
 try {
@@ -41,29 +43,36 @@ function renderMods() {
   $('can-craft').checked = state.canCraft !== false;
   $('craft-reason').textContent = state.canCraft === false ? state.reason || 'Lock crafting is unavailable. Only the no-lock strategy can be used.' : 'Requires a free opposite-side slot and room for a bench craft.';
   $('item-context').hidden = !state.itemName;
-  $('item-context').textContent = state.itemName ? `${state.itemName} · ${state.side === 'prefix' ? 'Prefixes' : 'Suffixes'} imported. Switch sides to see the other modifiers. Targets and ranges remain editable.` : '';
+  $('item-context').textContent = state.itemName ? `${state.itemName} · ${state.side === 'prefix' ? 'Prefixes' : 'Suffixes'} imported. Switch sides to see the other modifiers.${state.itemFlags?.length ? ` Planning as modifiable: ${state.itemFlags.join(', ')} flags ignored.` : ''}` : '';
   for (const side of ['prefix','suffix']) $(side).disabled = !!state.banks && !state.banks[side].mods.length;
   $('prefix').setAttribute('aria-pressed', state.side === 'prefix');
   $('suffix').setAttribute('aria-pressed', state.side === 'suffix');
-  $('mod-count').textContent = `${state.mods.length} / 3 modifiers`;
-  $('mods').innerHTML = state.mods.map((mod, i) => `<article class="mod" data-mod="${i}"><div class="mod-head"><span class="mod-id">${state.side === 'prefix' ? 'P' : 'S'}${i+1}</span><label class="mod-name"><input data-field="name" aria-label="Modifier ${i+1} name" list="mod-names" value="${esc(mod.name)}" maxlength="120"></label><button class="remove" data-action="remove" aria-label="Remove modifier ${i+1}" ${state.mods.length === 1 ? 'disabled' : ''}>×</button></div>${mod.source ? `<p class="copied-stat">${esc(mod.source)}</p>` : ""}${mod.rolls.map((r,j) => `<div data-roll="${j}">${Number.isFinite(r.current) ? `<p class="copied-value">Copied value: ${esc(r.current)}</p>` : ""}${mod.rolls.length > 1 ? `<div class="roll-label">NUMERIC ROLL ${j+1} · same modifier</div>` : ''}<div class="roll">${[['min','Min'],['max','Max'],['step','Step'],['target','Target']].map(([key,label]) => `<label>${label}<input type="number" step="any" data-field="${key}" aria-label="Modifier ${i+1} roll ${j+1} ${label}" value="${r[key]}" ${key === 'target' ? 'class="target-input"' : ''}></label>`).join('')}</div><div class="roll-options"><label>Accept <select data-field="direction" aria-label="Modifier ${i+1} roll ${j+1} target rule">${[['atLeast','At least'],['atMost','At most'],['exact','Exactly']].map(([value,label]) => `<option value="${value}" ${r.direction === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${mod.rolls.length > 1 ? '<button class="quiet" data-action="remove-roll">Remove roll</button>' : '<button class="quiet" data-action="max-target">Target maximum ↗</button>'}</div></div>`).join('')}<div class="mod-bottom"><label class="check"><input type="checkbox" data-field="hit" ${mod.hit ? 'checked' : ''}>Already at target</label><span class="chance" id="chance-${i}"></span></div><button class="quiet" style="margin-top:9px" data-action="add-roll" ${mod.rolls.length === 3 ? 'disabled' : ''}>＋ Add numeric roll (hybrid mod)</button></article>`).join('') + `<datalist id="mod-names">${templates[state.side].map(name => `<option value="${esc(name)}"></option>`).join('')}</datalist>`;
+  const fixedCount = state.mods.filter(m => m.fractured).length;
+  $('mod-count').textContent = fixedCount ? `${state.mods.length-fixedCount} to divine · ${fixedCount} fractured` : `${state.mods.length} / 3 modifiers`;
+  $('mods').innerHTML = state.mods.map((mod, i) => mod.fractured ? fixedModifierMarkup(mod,i) : `<article class="mod" data-mod="${i}"><div class="mod-head"><span class="mod-id">${state.side === 'prefix' ? 'P' : 'S'}${i+1}</span><label class="mod-name"><input data-field="name" aria-label="Modifier ${i+1} name" list="mod-names" value="${esc(mod.name)}" maxlength="120"></label><button class="remove" data-action="remove" aria-label="Remove modifier ${i+1}" ${state.mods.length === 1 ? 'disabled' : ''}>×</button></div><label class="check fracture-toggle"><input type="checkbox" data-field="fractured">Fractured · fixed</label>${mod.source ? `<p class="copied-stat">${esc(mod.source)}</p>` : ""}${mod.rolls.map((r,j) => `<div data-roll="${j}">${Number.isFinite(r.current) ? `<p class="copied-value">Copied value: ${esc(r.current)}</p>` : ""}${mod.rolls.length > 1 ? `<div class="roll-label">NUMERIC ROLL ${j+1} · same modifier</div>` : ''}<div class="roll">${[['min','Min'],['max','Max'],['step','Step'],['target','Target']].map(([key,label]) => `<label>${label}<input type="number" step="any" data-field="${key}" aria-label="Modifier ${i+1} roll ${j+1} ${label}" value="${r[key]}" ${key === 'target' ? 'class="target-input"' : ''}></label>`).join('')}</div><div class="roll-options"><label>Accept <select data-field="direction" aria-label="Modifier ${i+1} roll ${j+1} target rule">${[['atLeast','At least'],['atMost','At most'],['exact','Exactly']].map(([value,label]) => `<option value="${value}" ${r.direction === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${mod.rolls.length > 1 ? '<button class="quiet" data-action="remove-roll">Remove roll</button>' : '<button class="quiet" data-action="max-target">Target maximum ↗</button>'}</div></div>`).join('')}<div class="mod-bottom"><label class="check"><input type="checkbox" data-field="hit" ${mod.hit ? 'checked' : ''}>Already at target</label><span class="chance" id="chance-${i}"></span></div><button class="quiet" style="margin-top:9px" data-action="add-roll" ${mod.rolls.length === 3 ? 'disabled' : ''}>＋ Add numeric roll (hybrid mod)</button></article>`).join('') + `<datalist id="mod-names">${templates[state.side].map(name => `<option value="${esc(name)}"></option>`).join('')}</datalist>`;
   $('add').disabled = state.mods.length >= 3;
   renderSettings();
 }
 function renderSettings() {
+  if (state.mods[state.specific]?.fractured) state.specific=Math.max(0,state.mods.findIndex(m=>!m.fractured));
   for (const key of ['one','two','removal']) $(key).value = state[key];
   $('current-craft').innerHTML = state.mods.map((_,i) => `<option value="${i}" ${state.initialCraft === i ? 'selected' : ''}>${i ? `${i}-mod lock` : 'No lock'}</option>`).join('');
   $('current-craft').disabled = state.canCraft === false;
-  $('specific').innerHTML = state.mods.map((m,i) => `<option value="${i}" ${state.specific === i ? 'selected' : ''}>${i+1}. ${esc(m.name)}</option>`).join('');
+  $('specific').innerHTML = state.mods.map((m,i) => `<option value="${i}" ${state.specific === i ? 'selected' : ''} ${m.fractured ? 'disabled' : ''}>${i+1}. ${esc(m.name)}${m.fractured ? ' (fractured)' : ''}</option>`).join('');
+  $('specific').disabled = state.mods.every(m=>m.fractured);
+}
+function fixedModifierMarkup(mod,i) {
+  return `<article class="mod fractured-mod" data-mod="${i}"><div class="mod-head"><span class="mod-id">${state.side === 'prefix' ? 'P' : 'S'}${i+1}</span><label class="mod-name"><input data-field="name" aria-label="Modifier ${i+1} name" value="${esc(mod.name)}" maxlength="120"></label><button class="remove" data-action="remove" aria-label="Remove modifier ${i+1}" ${state.mods.length === 1 ? 'disabled' : ''}>×</button></div><label class="check fracture-toggle"><input type="checkbox" data-field="fractured" checked>Fractured · fixed</label>${mod.source ? `<p class="copied-stat">${esc(mod.source)}</p>` : ''}<p class="fracture-values">Fixed value${mod.rolls.length > 1 ? 's' : ''}: ${mod.rolls.map(r=>esc(r.current ?? r.target)).join(' / ')}</p><p class="hint">Excluded from Divine targets. Still occupies an affix slot and can receive a random lock.</p><span class="chance" id="chance-${i}"></span></article>`;
 }
 const actionName = k => k ? `${k}-mod lock` : 'No lock';
 function update() {
   try {
     const ps = probabilities(state.mods);
     const initialMask = state.mods.reduce((mask, m, i) => m.hit ? mask | (1 << i) : mask, 0);
-    const calculation = calculate(ps, {...state, initialMask});
+    const fracturedMask = fractureMask(state.mods);
+    const calculation = calculate(ps, {...state, initialMask, fracturedMask});
     const {results, goal, startMask, width, policy} = calculation;
-    state.mods.forEach((m,i) => {$(`chance-${i}`).textContent = `${pct(ps[i])} · 1 in ${fmt(1/ps[i])}`;});
+    state.mods.forEach((m,i) => {$(`chance-${i}`).textContent = m.fractured ? 'Fixed · no Divines needed' : `${pct(ps[i])} · 1 in ${fmt(1/ps[i])}`;});
     const [none, chosen, all, best] = results;
     const saving = none.cost > 0 ? Math.max(0, (1-best.cost/none.cost)*100) : 0;
     let next;
@@ -74,13 +83,13 @@ function update() {
     $('output').hidden = false;
     const descriptions = {
       none:['No lock','Reroll until every target hits on the same Divine.'],
-      specific:['Lock for a specific modifier',`Use a 1-mod craft while “${state.mods[state.specific].name}” is at target. Random protection still applies.`],
-      all:['Lock for all target rolls','Use 1- or 2-mod protection according to the number of targets currently met.']
+      specific:['Lock for a specific modifier',state.mods.every(m=>m.fractured) ? 'No non-fractured modifier to target; no Divines needed.' : `Use a 1-mod craft while “${state.mods[state.specific].name}” is at target. Random protection still applies.`],
+      all:['Lock for all target rolls','Use 1- or 2-mod protection according to the number of non-fractured targets currently met.']
     };
     const max = Math.max(none.cost, chosen.cost, all.cost, .001);
-    $('output').innerHTML = `<div class="recommendation"><span class="eyebrow">LOWEST EXPECTED COST · ADAPTIVE STRATEGY</span><h3>${startMask === goal ? 'Your targets are already met.' : saving > .05 ? 'Let the math choose your locks.' : 'No lock is already cost-optimal.'}</h3><div class="big-number">${fmt(best.cost)}<span>Divines on average</span></div><p>${saving > .05 ? `${fmt(saving)}% less than plain Divining. ` : ''}${fmt(best.rolls)} Divine rolls + ${fmt(Math.max(0,best.cost-best.rolls))} Divines in crafting costs.</p><div class="next-step"><strong>YOUR NEXT MOVE</strong>${esc(next)}</div></div><p class="compare-title">YOUR THREE STRATEGIES / EXPECTED TOTAL COST</p>${results.slice(0,3).map(r => state.canCraft === false && r.id !== "none" ? `<article class="strategy unavailable"><h3>${descriptions[r.id][0]}</h3><p>Unavailable on this item: a lock craft cannot currently be applied.</p></article>` : `<article class="strategy"><div class="strategy-top"><h3>${descriptions[r.id][0]}</h3><div class="strategy-cost">${fmt(r.cost)}<span>Divines total</span></div></div><p>${esc(descriptions[r.id][1])}</p><div class="metrics"><span>${fmt(r.rolls)} Divine rolls</span><span>${fmt(r.crafts)} craft applications</span><span>${fmt(r.removals)} removals</span></div><div class="cost-bar"><div style="width:${100*r.cost/max}%"></div></div></article>`).join('')}<p class="budget-note">Plain-roll success: <strong>${pct(ps.reduce((a,b)=>a*b,1))}</strong>. Costs include rolls, craft changes and final removal. Averages can hide long unlucky streaks.</p>`;
+    $('output').innerHTML = `<div class="recommendation"><span class="eyebrow">LOWEST EXPECTED COST · ADAPTIVE STRATEGY</span><h3>${startMask === goal ? 'No Divine rolls needed.' : saving > .05 ? 'Let the math choose your locks.' : 'No lock is already cost-optimal.'}</h3><div class="big-number">${fmt(best.cost)}<span>Divines on average</span></div><p>${saving > .05 ? `${fmt(saving)}% less than plain Divining. ` : ''}${fmt(best.rolls)} Divine rolls + ${fmt(Math.max(0,best.cost-best.rolls))} Divines in crafting costs.</p><div class="next-step"><strong>YOUR NEXT MOVE</strong>${esc(next)}</div></div><p class="compare-title">YOUR THREE STRATEGIES / EXPECTED TOTAL COST</p>${results.slice(0,3).map(r => state.canCraft === false && r.id !== "none" ? `<article class="strategy unavailable"><h3>${descriptions[r.id][0]}</h3><p>Unavailable on this item: a lock craft cannot currently be applied.</p></article>` : `<article class="strategy"><div class="strategy-top"><h3>${descriptions[r.id][0]}</h3><div class="strategy-cost">${fmt(r.cost)}<span>Divines total</span></div></div><p>${esc(descriptions[r.id][1])}</p><div class="metrics"><span>${fmt(r.rolls)} Divine rolls</span><span>${fmt(r.crafts)} craft applications</span><span>${fmt(r.removals)} removals</span></div><div class="cost-bar"><div style="width:${100*r.cost/max}%"></div></div></article>`).join('')}<p class="budget-note">Plain-roll success: <strong>${pct(ps.reduce((a,b)=>a*b,1))}</strong>. Costs include rolls, craft changes and final removal. Averages can hide long unlucky streaks.</p>`;
     const headings = state.mods.map((_,i) => `<th>With ${i ? i+'-mod lock' : 'no lock'}</th>`).join('');
-    $('policy').innerHTML = `<table><thead><tr><th>Targets met</th>${headings}</tr></thead><tbody>${Array.from({length:goal},(_,mask)=>`<tr><td>${state.mods.map((m,i)=>mask&(1<<i)?`${state.side === 'prefix' ? 'P' : 'S'}${i+1}`:null).filter(Boolean).join(' + ') || 'None'}</td>${state.mods.map((_,k)=>`<td>${actionName(policy[mask*width+k])}</td>`).join('')}</tr>`).join('')}<tr><td>All targets</td><td colspan="${width}">Stop; remove any craft.</td></tr></tbody></table>`;
+    $('policy').innerHTML = `<table><thead><tr><th>Targets met</th>${headings}</tr></thead><tbody>${Array.from({length:goal},(_,mask)=>mask).filter(mask=>(mask & fracturedMask) === fracturedMask).map(mask=>`<tr><td>${state.mods.map((m,i)=>!m.fractured && (mask&(1<<i))?`${state.side === 'prefix' ? 'P' : 'S'}${i+1}`:null).filter(Boolean).join(' + ') || 'None'}</td>${state.mods.map((_,k)=>`<td>${actionName(policy[mask*width+k])}</td>`).join('')}</tr>`).join('')}<tr><td>All Divine targets</td><td colspan="${width}">Stop; remove any craft.</td></tr></tbody></table>`;
     save();
   } catch (err) {
     $('error').hidden = false; $('error').textContent = err.message;
@@ -97,7 +106,7 @@ function importItem() {
     clearTimeout(timer);
     const item = parseItem($('item-paste').value);
     const side = item.banks[state.side].mods.length ? state.side : state.side === 'prefix' ? 'suffix' : 'prefix';
-    state = {...state,...structuredClone(item.banks[side]),side,banks:item.banks,itemName:item.itemName};
+    state = {...state,...structuredClone(item.banks[side]),side,banks:item.banks,itemName:item.itemName,itemFlags:item.itemFlags};
     history.replaceState(null,'',location.pathname+location.search);
     $('import-status').className = 'import-success';
     $('import-status').textContent = `Imported ${item.banks.prefix.mods.length} prefixes and ${item.banks.suffix.mods.length} suffixes from ${item.itemName}. ${item.notes.join(' ')}`;
@@ -118,6 +127,13 @@ $('can-craft').addEventListener('change',event=>{
 $('mods').addEventListener('input', event => {
   const field = event.target.dataset.field; if (!field) return;
   const i = Number(event.target.closest('[data-mod]').dataset.mod), mod = state.mods[i];
+  if (field === 'fractured') {
+    mod.fractured=event.target.checked;
+    if (mod.fractured) mod.rolls.forEach(r=>{r.current ??= r.target;});
+    else mod.rolls.forEach(r=>{r.target=r.max;});
+    mod.hit=atTarget(mod);
+    clearTimeout(timer);renderMods();update();return;
+  }
   if (field === 'hit') {mod.hit = event.target.checked;mod.rolls.forEach(r=>delete r.current);}
   else if (field === 'name') {mod.name = event.target.value; renderSettings();}
   else { const j = Number(event.target.closest('[data-roll]').dataset.roll); mod.rolls[j][field] = field === 'direction' ? event.target.value : event.target.value === '' ? NaN : Number(event.target.value); mod.hit=atTarget(mod);event.target.closest('[data-mod]').querySelector('[data-field="hit"]').checked=mod.hit; }
@@ -149,6 +165,7 @@ $('reset').addEventListener('click',()=>{clearTimeout(timer);state=defaults();$(
 $('share').addEventListener('click',async()=>{
   try {
     validState(state);
+    if (state.banks) state.banks[state.side]=bankFromState();
     const url = new URL(location.href);url.hash=new URLSearchParams({setup:JSON.stringify(state)}).toString();
     history.replaceState(null,'',url);
     await navigator.clipboard.writeText(url.href);

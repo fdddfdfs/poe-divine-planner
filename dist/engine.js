@@ -1,5 +1,6 @@
 // Exact finite-state expectations; no simulation is used in the calculator.
 export const popcount = n => n.toString(2).replaceAll('0', '').length;
+export const fractureMask = mods => mods.reduce((mask, mod, i) => mod.fractured ? mask | (1 << i) : mask, 0);
 
 export function rollProbability(roll) {
   const { min, max, step, target, direction } = roll;
@@ -24,21 +25,23 @@ export function probabilities(mods) {
   if (!Array.isArray(mods) || mods.length < 1 || mods.length > 3) throw new Error('Enter one to three modifiers on the selected side.');
   return mods.map(mod => {
     if (!Array.isArray(mod.rolls) || mod.rolls.length < 1 || mod.rolls.length > 3) throw new Error('Use one to three numeric rolls per modifier.');
-    return mod.rolls.reduce((p, r) => p * rollProbability(r), 1);
+    const p = mod.rolls.reduce((p, r) => p * rollProbability(r), 1);
+    return mod.fractured ? 1 : p;
   });
 }
 
 // A lock selects k DISTINCT modifiers uniformly on EACH Divine. All numeric
 // components of a selected modifier retain their current success/failure state.
-export function transition(ps, mask, k) {
+export function transition(ps, mask, k, fracturedMask = 0) {
   const size = 1 << ps.length;
   const result = Array(size).fill(0);
   const locks = Array.from({length: size}, (_, i) => i).filter(i => popcount(i) === k);
   for (const locked of locks) {
+    const protectedMask = locked | fracturedMask;
     for (let next = 0; next < size; next++) {
-      if ((next & locked) !== (mask & locked)) continue;
+      if ((next & protectedMask) !== ((mask | fracturedMask) & protectedMask)) continue;
       let p = 1 / locks.length;
-      for (let i = 0; i < ps.length; i++) if (!(locked & (1 << i))) p *= next & (1 << i) ? ps[i] : 1 - ps[i];
+      for (let i = 0; i < ps.length; i++) if (!(protectedMask & (1 << i))) p *= next & (1 << i) ? ps[i] : 1 - ps[i];
       result[next] += p;
     }
   }
@@ -64,6 +67,9 @@ function solve(matrix, rhs) {
 
 export function calculate(ps, settings = {}) {
   if (!ps.length || ps.length > 3 || ps.some(p => !Number.isFinite(p) || p <= 0 || p > 1)) throw new Error('Invalid modifier probabilities.');
+  const fracturedMask = settings.fracturedMask ?? 0;
+  if (!Number.isInteger(fracturedMask) || fracturedMask < 0 || fracturedMask >= (1 << ps.length)) throw new Error('Invalid fractured modifier mask.');
+  ps = ps.map((p,i) => fracturedMask & (1 << i) ? 1 : p);
   if (ps.reduce((a, b) => a * b, 1) < 1e-10) throw new Error('Combined odds are below 1 in 10 billion. Broaden a target for reliable results.');
   const { one = 1, two = 2, removal = 0, initialMask = 0, initialCraft = 0, specific = 0, canCraft = true } = settings;
   if ([one, two, removal].some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) throw new Error('Craft costs must be between 0 and 100 million Divines.');
@@ -75,7 +81,7 @@ export function calculate(ps, settings = {}) {
   const forced = ps.reduce((m, p, i) => p === 1 ? m | (1 << i) : m, 0);
   const startMask = initialMask | forced;
   const states = Array.from({length: goal * width}, (_, id) => ({mask: Math.floor(id / width), craft: id % width}));
-  const distributions = Array.from({length: goal}, (_, mask) => actions.map(k => transition(ps, mask, k)));
+  const distributions = Array.from({length: goal}, (_, mask) => actions.map(k => transition(ps, mask, k, fracturedMask)));
   const craftCosts = [0, one, two];
   function reward(craft, action, metric) {
     const changed = craft !== action;
@@ -111,8 +117,8 @@ export function calculate(ps, settings = {}) {
     return {id, ...values, policy, next: startMask === goal ? null : policy[startMask * width + initialCraft]};
   }
   const none = states.map(() => 0);
-  const chosen = states.map(s => canCraft && n > 1 && (s.mask & (1 << specific)) ? 1 : 0);
-  const all = states.map(s => canCraft ? Math.min(popcount(s.mask), n - 1) : 0);
+  const chosen = states.map(s => canCraft && n > 1 && !(fracturedMask & (1 << specific)) && (s.mask & (1 << specific)) ? 1 : 0);
+  const all = states.map(s => canCraft ? Math.min(popcount(s.mask & ~fracturedMask), n - 1) : 0);
   const best = [...none];
   let iterations = 0;
   for (; iterations < 100; iterations++) {
