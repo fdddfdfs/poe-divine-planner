@@ -47,7 +47,7 @@ export function parseItem(text) {
   if (itemFlags.length) notes.add(`${itemFlags.join(', ')} flags are ignored for this modifiable-item planning model.`);
   if (lines.some(s => /^Fractured Item$/i.test(s)) && !groups.some(g => g.fractured))
     throw new Error('The item is fractured, but no modifier is marked (fractured). Copy the full advanced text so the fixed modifier can be identified.');
-  if (groups.some(g => g.fractured)) notes.add('Fractured modifiers stay at their copied values and are excluded from Divine targets. They still occupy affix slots and can receive a random lock.');
+  if (groups.some(g => g.fractured)) notes.add('Fractured modifiers stay at their copied values and are excluded from Divine targets. They still occupy affix slots and can receive random protection.');
   for (const group of groups) {
     if (!group.lines.length) throw new Error('A modifier header has no stat text. Copy the complete item again.');
     const description = group.lines.join(' / ');
@@ -95,9 +95,9 @@ export function parseItem(text) {
     const removableCraft = removable.length > 0 && !sides[side].some(m => m.crafted) && !sides[opposite].some(m => m.crafted && m.fractured);
     const canCraft = removableCraft || (sides[opposite].length < 3 && !anyCraft);
     const reason = removableCraft
-      ? `Assumes the crafted ${opposite} (${removable.map(m => m.name).join('; ')}) is removed when the first lock is applied. Its removal is charged once using the removal cost below. No-lock keeps it; recrafting it afterward is not included.`
-      : anyCraft ? 'An existing craft cannot be removed without affecting a target or fixed modifier. Lock strategies are unavailable for this side.'
-      : sides[opposite].length === 3 ? `All three ${opposite} slots are occupied. Lock strategies need a free ${opposite} slot.` : '';
+      ? `Assumes the crafted ${opposite} (${removable.map(m => m.name).join('; ')}) is removed when the first protection bench craft is applied. Its removal is charged once using the removal cost below. Divine-only keeps it; recrafting it afterward is not included.`
+      : anyCraft ? 'An existing craft cannot be removed without affecting a target or fixed modifier. Protection bench craft strategies are unavailable for this side.'
+      : sides[opposite].length === 3 ? `All three ${opposite} slots are occupied. Protection bench craft strategies need a free ${opposite} slot.` : '';
     banks[side] = {mods:sides[side],canCraft,removableCraft,reason,initialCraft:0,specific:'all'};
   }
   notes.add('Targets default to the highest numeric values. Change the target rule for stats where lower is better.');

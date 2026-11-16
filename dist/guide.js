@@ -1,6 +1,6 @@
 export const benchCraftName = (count, side) => `${count} ${side === "suffix" ? "suffix" : "prefix"}${count === 1 ? "" : "es"} cannot be changed`;
 
-// Translate the computed policy directly; never infer a lock from target count.
+// Translate the computed policy directly; never infer a protection bench craft from target count.
 export function buildGuide(calculation, mods, settings) {
   const {goal, width, policy, ps, originalCraft} = calculation;
   const forced = ps.reduce((mask,p,i)=>p === 1 ? mask | (1 << i) : mask,0);
@@ -8,12 +8,12 @@ export function buildGuide(calculation, mods, settings) {
   const side = settings.side === 'suffix' ? 'suffix' : 'prefix';
   const lock = k => benchCraftName(k, side);
   const crafts = Array.from({length:width},(_,i)=>i).filter(i=>settings.canCraft !== false || i === 0 || i === originalCraft || i === settings.initialCraft);
-  const craftName = k => k === originalCraft ? 'Original bench craft still present' : k ? `“${lock(k)}” already applied` : originalCraft >= 0 ? 'Original craft removed; no lock' : 'No lock applied';
+  const craftName = k => k === originalCraft ? 'Original bench craft still present' : k ? `“${lock(k)}” already applied` : originalCraft >= 0 ? 'Original craft removed; no protection bench craft' : 'No protection bench craft applied';
   function instruction(action, current) {
-    if (action === null) return current > 0 && current !== originalCraft ? 'Stop Divining. Remove the remaining lock craft; your targets are complete.' : 'Stop. Your targets are complete; no more Divines needed.';
-    if (!action) return current > 0 && current !== originalCraft ? 'Remove the lock, then use one Divine without a lock.' : 'Use one Divine without a lock.';
+    if (action === null) return current > 0 && current !== originalCraft ? 'Stop Divining. Remove the remaining protection bench craft; your targets are complete.' : 'Stop. Your targets are complete; no more Divines needed.';
+    if (!action) return current > 0 && current !== originalCraft ? 'Remove the protection bench craft, then use one Divine without a protection bench craft.' : 'Use one Divine without a protection bench craft.';
     if (action === current) return `Keep “${lock(action)}” and use one Divine.`;
-    const removal = current === originalCraft ? `Remove the crafted ${side === 'prefix' ? 'suffix' : 'prefix'} to make room. ` : current > 0 ? 'Remove the current lock. ' : '';
+    const removal = current === originalCraft ? `Remove the crafted ${side === 'prefix' ? 'suffix' : 'prefix'} to make room. ` : current > 0 ? 'Remove the current protection bench craft. ' : '';
     return `${removal}Apply “${lock(action)}”, then use one Divine.`;
   }
   const rows = [];

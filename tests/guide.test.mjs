@@ -10,7 +10,7 @@ test('wand guide covers all variable outcomes and uses the actual optimal policy
   const guide=buildGuide(calc,mods,settings);
   assert.deepEqual(guide.variable,[1,2]);
   assert.deepEqual(guide.rows.map(r=>r.mask),[1,3,5,7]);
-  assert.match(guide.first,/without a lock/);
+  assert.match(guide.first,/without a protection bench craft/);
   for(const row of guide.rows)for(const group of row.groups)for(const craft of group.crafts){
     assert.equal(group.action,row.complete?null:calc.policy[row.mask*calc.width+craft]);
   }
@@ -21,7 +21,7 @@ test('wand guide covers all variable outcomes and uses the actual optimal policy
   const completed=guide.rows.at(-1).groups[0].instructions;
   assert.match(completed.find(i=>i.craft===3).text,/no more Divines/);
   assert.doesNotMatch(completed.find(i=>i.craft===3).text,/Remove/);
-  assert.match(completed.find(i=>i.craft===2).text,/Remove the remaining lock/);
+  assert.match(completed.find(i=>i.craft===2).text,/Remove the remaining protection bench craft/);
 });
 
 test('guide distinguishes current crafts when switching costs change the action',()=>{

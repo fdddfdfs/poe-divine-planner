@@ -101,7 +101,7 @@ test('full suffixes with crafted Double Damage allow prefix locks without droppi
   assert.equal(s.mods.length,3);assert.equal(s.mods[2].crafted,true);
   assert.equal(p.canCraft,true);assert.equal(p.removableCraft,true);
   assert.equal(s.canCraft,false);assert.equal(s.removableCraft,false);
-  assert.match(p.reason,/removed when the first lock/);
+  assert.match(p.reason,/removed when the first protection bench craft/);
   const fixed=parseItem(text.replace('Master Crafted Suffix','Fractured Master Crafted Suffix'));
   assert.equal(fixed.banks.prefix.canCraft,false);
   assert.equal(fixed.banks.prefix.removableCraft,false);
