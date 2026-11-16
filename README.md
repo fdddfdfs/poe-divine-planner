@@ -4,6 +4,12 @@ A small, static Path of Exile 1 calculator for the expected cost of divining one
 
 ## Use
 
+**Paste an item:** hover a rare item in PoE and copy its advanced description (normally Ctrl+Alt+C; use your configured advanced-description binding). Paste in the item box to import automatically, or click **Import item** after editing the text. The English copy must contain `{ Prefix Modifier ... }` / `{ Suffix Modifier ... }` headers and inline `current(min-max)` ranges. Ordinary text without those details is rejected instead of guessing tiers.
+
+Both sides are imported and retained when switching Prefixes/Suffixes, including edits. Implicits, enchantments, item properties and reminder text are excluded. Hybrid stat lines stay in one modifier; added damage keeps its two numeric ranges. Fixed modifiers still occupy a random-lock candidate. Targets default to the highest numeric value, with “Already at target” derived from current values. Review lower-is-better targets and inferred decimal Step sizes. Copied values are shown beside the editable ranges.
+
+The importer checks opposite-side slot availability and existing bench crafts. When a lock cannot be added, only no-lock calculations are recommended. You can explicitly change **Can apply a lock craft** after preparing the item. Existing metacrafts and scaled/catalyst, fractured, corrupted, mirrored or unidentified items are rejected with explanations; the previous setup is preserved. Import does not require a mod database or send item text to a server.
+
 Choose prefixes or suffixes, include **all modifiers on that side**, enter the raw roll ranges from your item, and choose targets. Names are editable with a small suggestion list; this is not a tier/mod database. Demo ranges are illustrative. Multiple numeric rolls in a hybrid belong under the **same modifier**. Check “Already at target” only if every numeric target on that modifier is currently met. For a modifier you don't care about, set its target to the minimum with “At least” so every roll qualifies, but keep it listed as a candidate for the random lock.
 
 The comparison covers:
@@ -51,5 +57,6 @@ The UI stores setups in localStorage. Share links encode the setup in the URL fr
 - [GGG Covens of Umbra FAQ](https://www.pathofexile.com/forum/view-post/26880030)
 - [3.30 patch notes mirror](https://poedb.tw/us/Version_3.30.0)
 - [FAQ transcript and discussion](https://www.reddit.com/r/pathofexile/comments/1xtt53e/updates_to_covens_of_umbra_faq_1111/)
+- [Advanced item clipboard format research](https://github.com/timeloop-vault/poe-inspect/blob/main/docs/research/item-format-and-data.md)
 
 Fan-made; not affiliated with Grinding Gear Games. No game art is included.

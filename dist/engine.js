@@ -65,7 +65,7 @@ function solve(matrix, rhs) {
 export function calculate(ps, settings = {}) {
   if (!ps.length || ps.length > 3 || ps.some(p => !Number.isFinite(p) || p <= 0 || p > 1)) throw new Error('Invalid modifier probabilities.');
   if (ps.reduce((a, b) => a * b, 1) < 1e-10) throw new Error('Combined odds are below 1 in 10 billion. Broaden a target for reliable results.');
-  const { one = 1, two = 2, removal = 0, initialMask = 0, initialCraft = 0, specific = 0 } = settings;
+  const { one = 1, two = 2, removal = 0, initialMask = 0, initialCraft = 0, specific = 0, canCraft = true } = settings;
   if ([one, two, removal].some(v => !Number.isFinite(v) || v < 0 || v > 1e8)) throw new Error('Craft costs must be between 0 and 100 million Divines.');
   const n = ps.length, size = 1 << n, goal = size - 1;
   // Locking all modifiers cannot make progress. Existing full-side locks must
@@ -111,8 +111,8 @@ export function calculate(ps, settings = {}) {
     return {id, ...values, policy, next: startMask === goal ? null : policy[startMask * width + initialCraft]};
   }
   const none = states.map(() => 0);
-  const chosen = states.map(s => n > 1 && (s.mask & (1 << specific)) ? 1 : 0);
-  const all = states.map(s => Math.min(popcount(s.mask), n - 1));
+  const chosen = states.map(s => canCraft && n > 1 && (s.mask & (1 << specific)) ? 1 : 0);
+  const all = states.map(s => canCraft ? Math.min(popcount(s.mask), n - 1) : 0);
   const best = [...none];
   let iterations = 0;
   for (; iterations < 100; iterations++) {
@@ -121,6 +121,7 @@ export function calculate(ps, settings = {}) {
     states.forEach((s, id) => {
       let bestCost = values[id], bestAction = best[id];
       for (const action of actions) {
+        if (!canCraft && action > 0) continue;
         const q = reward(s.craft, action, 'cost') + distributions[s.mask][action].reduce((sum, p, next) => sum + p * (next === goal ? terminal(action, 'cost') : values[next * width + action]), 0);
         if (q < bestCost - 1e-9 * Math.max(1, Math.abs(bestCost))) { bestCost = q; bestAction = action; }
       }
