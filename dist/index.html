@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Divine Planner — PoE roll & lock calculator</title>
+  <meta name="description" content="Compare expected Divine Orb costs for random prefix and suffix locks. Plan modifier targets, compare crafting strategies and find the cheapest adaptive policy.">
+  <meta name="theme-color" content="#111615"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="./"><span class="brand-icon">◇</span> DIVINE<span>PLANNER</span></a><nav><span class="version">PATH OF EXILE 1</span><a href="#method">How it works ↗</a><a href="https://github.com/fdddfdfs/poe-divine-planner">GitHub ↗</a></nav></header>
+<main>
+  <section class="hero"><div><p class="eyebrow">A LITTLE MATH. A LOT FEWER DIVINES.</p><h1>Make every<br><em>Divine</em> count.</h1><p class="intro">Pick your modifiers. Set your perfect roll.<br>Find out when a lock is actually worth it.</p></div><div class="hero-art" aria-hidden="true"><div class="orbit outer"></div><div class="orbit inner"></div><span class="gem">◇</span><span class="orbit-note">ROLL · PROTECT · REPEAT</span></div></section>
+  <div class="mechanic"><span class="dot"></span><p><strong>Random protection, every roll.</strong> A 1-mod lock protects a random modifier on each Divine. It does not guarantee protection for the modifier you want.</p><a href="#method">Model details ↓</a></div>
+  <div class="workspace">
+    <section class="panel inputs" aria-labelledby="setup-title">
+      <div class="section-title"><div><span class="eyebrow">01 / YOUR ITEM</span><h2 id="setup-title">Set your targets</h2></div><button id="reset" class="quiet">Reset demo ↺</button></div>
+      <div class="toolbar"><div class="segmented" aria-label="Modifier side"><button id="prefix" aria-pressed="true">Prefixes</button><button id="suffix" aria-pressed="false">Suffixes</button></div><span id="mod-count"></span></div>
+      <p class="hint">Include <strong>every modifier on this side</strong>, even fixed-value or unwanted ones: they can receive the random lock. Use your item's raw tier ranges (Alt hover). Example ranges below are editable, not a live mod database.</p>
+      <div id="mods"></div>
+      <button id="add" class="add">＋ Add modifier</button>
+      <details class="settings" open><summary>Craft costs & starting state <span>Divine equivalents</span></summary><div class="cost-grid"><label>1-mod craft<input id="one" type="number" min="0" step="any"></label><label>2-mod craft<input id="two" type="number" min="0" step="any"></label><label>Remove craft<input id="removal" type="number" min="0" step="any"></label></div><p class="hint">Crafts persist through Divines. Pay again only when changing the craft. Removal cost includes each replacement and the final cleanup; 0 ignores that currency cost.</p><div class="settings-grid"><label>Craft currently on item<select id="current-craft"></select></label><label>Specific modifier strategy<select id="specific"></select></label></div></details>
+      <div class="share-row"><button id="share" class="quiet">Copy setup link ↗</button><span id="save-status" role="status">Saved in this browser</span></div>
+    </section>
+    <section class="results" aria-labelledby="results-title">
+      <div class="section-title"><div><span class="eyebrow">02 / THE NUMBERS</span><h2 id="results-title">Choose your approach</h2></div><span class="live">● Live calculation</span></div>
+      <div id="error" role="alert" hidden></div>
+      <div id="output" aria-live="polite" aria-atomic="true"></div>
+      <details class="policy"><summary>Optimal action for every roll outcome</summary><p class="hint">After each Divine, check which targets are met. The action also depends on the craft already on the item.</p><div id="policy"></div></details>
+    </section>
+  </div>
+  <section id="method" class="method"><span class="eyebrow">THE FINE PRINT, MADE READABLE</span><h2>Odds, not promises.</h2><div class="method-grid"><div><h3>What is being compared?</h3><p><b>No lock:</b> remove any craft and Divine until all targets hit together.</p><p><b>Specific modifier:</b> use a 1-mod craft while your chosen modifier meets its target; remove it when that target is lost. The protected modifier is still random.</p><p><b>All target rolls:</b> use a 1-mod craft with one successful modifier, a 2-mod craft with two. Re-evaluate after every roll. “All” is a strategy name, not guaranteed protection.</p><p><b>Optimal adaptive:</b> choose no craft, a 1-mod craft or a 2-mod craft in each state to minimize expected total cost, including switching costs.</p></div><div><h3>What goes into the math?</h3><p>Uniform, independent rolls within the entered tier ranges, with inclusive endpoints. A modifier with multiple numeric rolls hits only when <em>all</em> its targets hit. Group hybrid stats under one modifier; a lock protects the entire modifier.</p><p>Each Divine selects a fresh, uniformly random set of distinct modifiers to protect. The remaining modifiers reroll. The calculator solves the resulting finite-state equations exactly up to floating-point precision; it does not estimate with random samples.</p><p>For a plain Divine, the success chance is the product of the modifier chances. From an unfinished item, its average roll count is 1 ÷ that chance. Average spending is not a guaranteed budget.</p></div><div><h3>Scope & crafting rules</h3><p>One side of a rare item at a time, up to three modifiers. You need an available opposite-side slot for the craft. The other side can reroll; these results do not preserve it or optimize a whole six-mod item.</p><p>No fractured, corrupted, mirrored or otherwise unmodifiable items; no lucky rolls, quality/catalyst rounding, Hinekora's Locks or other crafting methods. Use unscaled ranges. Full-side locks cannot improve that same side and are excluded.</p><p>Defaults: 1 Divine for a 1-mod craft, 2 for a 2-mod craft. Random-per-Divine behavior is an explicit model assumption confirmed by this tool's requester; verify in-game after patches.</p><p class="sources">References: <a href="https://www.pathofexile.com/forum/view-post/26880030">GGG crafting FAQ</a> · <a href="https://poedb.tw/us/Version_3.30.0">3.30 patch notes mirror</a> · <a href="https://www.reddit.com/r/pathofexile/comments/1xtt53e/updates_to_covens_of_umbra_faq_1111/">FAQ discussion</a></p></div></div></section>
+</main>
+<footer><span>◇ DIVINE PLANNER</span><p>Fan-made. Not affiliated with Grinding Gear Games. Your setup stays in your browser.</p><a href="https://github.com/fdddfdfs/poe-divine-planner/issues">Report an issue ↗</a></footer>
+<script type="module" src="app.js"></script>
+</body></html>
