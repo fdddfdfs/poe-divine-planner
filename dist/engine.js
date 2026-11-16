@@ -76,7 +76,14 @@ export function calculate(ps, settings = {}) {
   const n = ps.length, size = 1 << n, goal = size - 1;
   // Locking all modifiers cannot make progress. Existing full-side locks must
   // be removed before using this one-side optimizer.
-  const actions = Array.from({length: n}, (_, i) => i), width = n;
+  const actions = Array.from({length: n}, (_, i) => i);
+  if (settings.removableCraft !== undefined && typeof settings.removableCraft !== 'boolean') throw new Error('Invalid removable craft setting.');
+  // Extra state: the original opposite-side bench craft is still present.
+  // Plain Divines retain it; the first lock removes it exactly once.
+  const originalCraft = settings.removableCraft ? n : -1;
+  const width = n + Number(originalCraft >= 0);
+  const startCraft = originalCraft >= 0 && initialCraft === 0 ? originalCraft : initialCraft;
+  const nextCraft = (craft, action) => craft === originalCraft && action === 0 ? originalCraft : action;
   if (!Number.isInteger(initialMask) || initialMask < 0 || initialMask > goal || !actions.includes(initialCraft) || !Number.isInteger(specific) || specific < 0 || specific >= n) throw new Error('Invalid starting state.');
   const forced = ps.reduce((m, p, i) => p === 1 ? m | (1 << i) : m, 0);
   const startMask = initialMask | forced;
@@ -84,6 +91,7 @@ export function calculate(ps, settings = {}) {
   const distributions = Array.from({length: goal}, (_, mask) => actions.map(k => transition(ps, mask, k, fracturedMask)));
   const craftCosts = [0, one, two];
   function reward(craft, action, metric) {
+    if (craft === originalCraft && action === 0) return metric === 'cost' || metric === 'rolls' ? 1 : 0;
     const changed = craft !== action;
     if (metric === 'rolls') return 1;
     if (metric === 'crafts') return Number(changed && action > 0);
@@ -91,6 +99,7 @@ export function calculate(ps, settings = {}) {
     return 1 + (changed ? craftCosts[action] + (craft > 0 ? removal : 0) : 0);
   }
   function terminal(craft, metric) {
+    if (craft === originalCraft) return 0;
     if (metric === 'cost') return craft > 0 ? removal : 0;
     if (metric === 'removals') return Number(craft > 0);
     return 0;
@@ -98,23 +107,23 @@ export function calculate(ps, settings = {}) {
   function evaluate(policy, metric) {
     const matrix = states.map((s, id) => {
       const row = Array(states.length).fill(0), a = policy[id]; row[id] = 1;
-      distributions[s.mask][a].forEach((p, next) => { if (next !== goal) row[next * width + a] -= p; });
+      distributions[s.mask][a].forEach((p, next) => { if (next !== goal) row[next * width + nextCraft(s.craft, a)] -= p; });
       return row;
     });
     const rhs = states.map((s, id) => {
       const a = policy[id];
-      return reward(s.craft, a, metric) + distributions[s.mask][a][goal] * terminal(a, metric);
+      return reward(s.craft, a, metric) + distributions[s.mask][a][goal] * terminal(nextCraft(s.craft, a), metric);
     });
     return solve(matrix, rhs);
   }
   function result(id, policy) {
     const values = {};
     for (const metric of ['cost', 'rolls', 'crafts', 'removals']) {
-      values[metric] = startMask === goal ? terminal(initialCraft, metric) : evaluate(policy, metric)[startMask * width + initialCraft];
+      values[metric] = startMask === goal ? terminal(startCraft, metric) : evaluate(policy, metric)[startMask * width + startCraft];
       if (!Number.isFinite(values[metric]) || values[metric] < -1e-5) throw new Error('Numerical calculation failed. Broaden a target.');
       values[metric] = Math.max(0, values[metric]);
     }
-    return {id, ...values, policy, next: startMask === goal ? null : policy[startMask * width + initialCraft]};
+    return {id, ...values, policy, next: startMask === goal ? null : policy[startMask * width + startCraft]};
   }
   const none = states.map(() => 0);
   const chosen = states.map(s => canCraft && n > 1 && !(fracturedMask & (1 << specific)) && (s.mask & (1 << specific)) ? 1 : 0);
@@ -128,7 +137,8 @@ export function calculate(ps, settings = {}) {
       let bestCost = values[id], bestAction = best[id];
       for (const action of actions) {
         if (!canCraft && action > 0) continue;
-        const q = reward(s.craft, action, 'cost') + distributions[s.mask][action].reduce((sum, p, next) => sum + p * (next === goal ? terminal(action, 'cost') : values[next * width + action]), 0);
+        const craft = nextCraft(s.craft, action);
+        const q = reward(s.craft, action, 'cost') + distributions[s.mask][action].reduce((sum, p, next) => sum + p * (next === goal ? terminal(craft, 'cost') : values[next * width + craft]), 0);
         if (q < bestCost - 1e-9 * Math.max(1, Math.abs(bestCost))) { bestCost = q; bestAction = action; }
       }
       if (best[id] !== bestAction) {best[id] = bestAction; changed = true;}
@@ -137,5 +147,5 @@ export function calculate(ps, settings = {}) {
   }
   if (iterations === 100) throw new Error('Optimizer did not converge. Try less extreme inputs.');
   const results = [result('none', none), result('specific', chosen), result('all', all), result('optimal', best)];
-  return { results, states, goal, startMask, width, ps, policy: best };
+  return { results, states, goal, startMask, width, ps, policy: best, originalCraft };
 }

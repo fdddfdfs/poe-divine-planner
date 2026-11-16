@@ -41,7 +41,7 @@ function save() {
 }
 function renderMods() {
   $('can-craft').checked = state.canCraft !== false;
-  $('craft-reason').textContent = state.canCraft === false ? state.reason || 'Lock crafting is unavailable. Only the no-lock strategy can be used.' : 'Requires a free opposite-side slot and room for a bench craft.';
+  $('craft-reason').textContent = state.canCraft === false ? state.reason || 'Lock crafting is unavailable. Only the no-lock strategy can be used.' : state.removableCraft ? state.reason : 'Requires a free opposite-side slot and room for a bench craft.';
   $('item-context').hidden = !state.itemName;
   $('item-context').textContent = state.itemName ? `${state.itemName} · ${state.side === 'prefix' ? 'Prefixes' : 'Suffixes'} imported. Switch sides to see the other modifiers.${state.itemFlags?.length ? ` Planning as modifiable: ${state.itemFlags.join(', ')} flags ignored.` : ''}` : '';
   for (const side of ['prefix','suffix']) $(side).disabled = !!state.banks && !state.banks[side].mods.length;
@@ -71,14 +71,14 @@ function update() {
     const initialMask = state.mods.reduce((mask, m, i) => m.hit ? mask | (1 << i) : mask, 0);
     const fracturedMask = fractureMask(state.mods);
     const calculation = calculate(ps, {...state, initialMask, fracturedMask});
-    const {results, goal, startMask, width, policy} = calculation;
+    const {results, goal, startMask, width, policy, originalCraft} = calculation;
     state.mods.forEach((m,i) => {$(`chance-${i}`).textContent = m.fractured ? 'Fixed · no Divines needed' : `${pct(ps[i])} · 1 in ${fmt(1/ps[i])}`;});
     const [none, chosen, all, best] = results;
     const saving = none.cost > 0 ? Math.max(0, (1-best.cost/none.cost)*100) : 0;
     let next;
     if (startMask === goal) next = state.initialCraft ? 'All targets are met. Remove the remaining craft; no more Divines needed.' : 'All targets are met. You are done; no Divines needed.';
     else if (best.next === state.initialCraft) next = `${best.next ? `Keep the ${best.next}-mod lock` : 'Leave the item unlocked'}, use a Divine, then re-check your targets.`;
-    else next = `${state.initialCraft ? 'Remove the current craft. ' : ''}${best.next ? `Apply the ${best.next}-mod lock` : 'Leave the item unlocked'}, then use a Divine.`;
+    else next = `${state.initialCraft ? 'Remove the current craft. ' : state.removableCraft && best.next ? `Remove the crafted ${state.side === 'prefix' ? 'suffix' : 'prefix'}. ` : ''}${best.next ? `Apply the ${best.next}-mod lock` : 'Leave the item unlocked'}, then use a Divine.`;
     $('error').hidden = true;
     $('output').hidden = false;
     const descriptions = {
@@ -88,8 +88,9 @@ function update() {
     };
     const max = Math.max(none.cost, chosen.cost, all.cost, .001);
     $('output').innerHTML = `<div class="recommendation"><span class="eyebrow">LOWEST EXPECTED COST · ADAPTIVE STRATEGY</span><h3>${startMask === goal ? 'No Divine rolls needed.' : saving > .05 ? 'Let the math choose your locks.' : 'No lock is already cost-optimal.'}</h3><div class="big-number">${fmt(best.cost)}<span>Divines on average</span></div><p>${saving > .05 ? `${fmt(saving)}% less than plain Divining. ` : ''}${fmt(best.rolls)} Divine rolls + ${fmt(Math.max(0,best.cost-best.rolls))} Divines in crafting costs.</p><div class="next-step"><strong>YOUR NEXT MOVE</strong>${esc(next)}</div></div><p class="compare-title">YOUR THREE STRATEGIES / EXPECTED TOTAL COST</p>${results.slice(0,3).map(r => state.canCraft === false && r.id !== "none" ? `<article class="strategy unavailable"><h3>${descriptions[r.id][0]}</h3><p>Unavailable on this item: a lock craft cannot currently be applied.</p></article>` : `<article class="strategy"><div class="strategy-top"><h3>${descriptions[r.id][0]}</h3><div class="strategy-cost">${fmt(r.cost)}<span>Divines total</span></div></div><p>${esc(descriptions[r.id][1])}</p><div class="metrics"><span>${fmt(r.rolls)} Divine rolls</span><span>${fmt(r.crafts)} craft applications</span><span>${fmt(r.removals)} removals</span></div><div class="cost-bar"><div style="width:${100*r.cost/max}%"></div></div></article>`).join('')}<p class="budget-note">Plain-roll success: <strong>${pct(ps.reduce((a,b)=>a*b,1))}</strong>. Costs include rolls, craft changes and final removal. Averages can hide long unlucky streaks.</p>`;
-    const headings = state.mods.map((_,i) => `<th>With ${i ? i+'-mod lock' : 'no lock'}</th>`).join('');
-    $('policy').innerHTML = `<table><thead><tr><th>Targets met</th>${headings}</tr></thead><tbody>${Array.from({length:goal},(_,mask)=>mask).filter(mask=>(mask & fracturedMask) === fracturedMask).map(mask=>`<tr><td>${state.mods.map((m,i)=>!m.fractured && (mask&(1<<i))?`${state.side === 'prefix' ? 'P' : 'S'}${i+1}`:null).filter(Boolean).join(' + ') || 'None'}</td>${state.mods.map((_,k)=>`<td>${actionName(policy[mask*width+k])}</td>`).join('')}</tr>`).join('')}<tr><td>All Divine targets</td><td colspan="${width}">Stop; remove any craft.</td></tr></tbody></table>`;
+    const columns = Array.from({length:width},(_,i)=>i);
+    const headings = columns.map(i => `<th>${i === originalCraft ? 'Original craft present' : i ? `With ${i}-mod lock` : state.removableCraft ? 'After removal, no lock' : 'With no lock'}</th>`).join('');
+    $('policy').innerHTML = `<table><thead><tr><th>Targets met</th>${headings}</tr></thead><tbody>${Array.from({length:goal},(_,mask)=>mask).filter(mask=>(mask & fracturedMask) === fracturedMask).map(mask=>`<tr><td>${state.mods.map((m,i)=>!m.fractured && (mask&(1<<i))?`${state.side === 'prefix' ? 'P' : 'S'}${i+1}`:null).filter(Boolean).join(' + ') || 'None'}</td>${columns.map(k=>`<td>${k === originalCraft && policy[mask*width+k] ? 'Remove craft → ' : ''}${actionName(policy[mask*width+k])}</td>`).join('')}</tr>`).join('')}<tr><td>All Divine targets</td><td colspan="${width}">Stop; remove any lock craft.</td></tr></tbody></table>`;
     save();
   } catch (err) {
     $('error').hidden = false; $('error').textContent = err.message;
@@ -99,7 +100,7 @@ function update() {
 }
 let timer;
 function bankFromState() {
-  return structuredClone({mods:state.mods,canCraft:state.canCraft !== false,reason:state.reason || '',initialCraft:state.initialCraft,specific:state.specific});
+  return structuredClone({mods:state.mods,canCraft:state.canCraft !== false,removableCraft:!!state.removableCraft,reason:state.reason || '',initialCraft:state.initialCraft,specific:state.specific});
 }
 function importItem() {
   try {

@@ -79,8 +79,8 @@ test('target-count and specific strategies do not lock merely because a fracture
   assert.equal(oneHit.results[2].next,1);
 });
 test('independent seeded Monte Carlo agrees with all four policy expectations',()=>{
-  for (const fracturedMask of [0,1]) {
-  const ps=[.25,.5,.2], config={one:1,two:2,removal:.1,specific:2,fracturedMask};
+  for (const fracturedMask of [0,1]) for (const removableCraft of [false,true]) {
+  const ps=[.25,.5,.2], config={one:1,two:2,removal:.1,specific:2,fracturedMask,removableCraft};
   const expected=calculate(ps,config);
   let seed=4201;
   const rng=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -88,23 +88,59 @@ test('independent seeded Monte Carlo agrees with all four policy expectations',(
   for(const result of expected.results){
     let total=0,rolls=0;
     for(let trial=0;trial<trials;trial++){
-      let mask=fracturedMask,craft=0,cost=0,count=0;
+      let mask=fracturedMask,craft=removableCraft?3:0,cost=0,count=0;
       while(mask!==7){
-        const a=result.policy[mask*3+craft];
-        if(a!==craft){if(craft)cost+=config.removal;cost+=[0,config.one,config.two][a];}
-        craft=a;cost++;count++;
+        const a=result.policy[mask*expected.width+craft];
+        if(a!==craft && !(craft===3 && a===0)){if(craft)cost+=config.removal;cost+=[0,config.one,config.two][a];}
+        if(craft!==3 || a!==0)craft=a;cost++;count++;
         const indices=[0,1,2];
         for(let i=2;i>0;i--){const j=Math.floor(rng()*(i+1));[indices[i],indices[j]]=[indices[j],indices[i]];}
-        const locked=indices.slice(0,craft);
+        const locked=indices.slice(0,a);
         for(let i=0;i<3;i++)if(!(fracturedMask&(1<<i)) && !locked.includes(i)){
           if(rng()<ps[i])mask|=1<<i;else mask&=~(1<<i);
         }
         assert.ok(count<100000,'Simulation should terminate');
       }
-      if(craft)cost+=config.removal;
+      if(craft && craft!==3)cost+=config.removal;
       total+=cost;rolls+=count;
     }
     close(total/trials,result.cost,.025);close(rolls/trials,result.rolls,.025);
   }
+  }
+});
+
+
+test('original opposite craft survives plain rolls and completed setups for free',()=>{
+  for(const canCraft of [true,false]) {
+    const r=calculate([.2,.3],{removableCraft:true,removal:7,canCraft}).results[0];
+    close(r.cost,1/.06);close(r.removals,0);close(r.crafts,0);
+  }
+  for(const r of calculate([.2,.3],{removableCraft:true,initialMask:3,removal:7}).results)close(r.cost,0);
+  assert.throws(()=>calculate([.5,.5],{removableCraft:'yes'}),/removable/);
+});
+
+test('first lock removes original craft once, not on subsequent craft switches',()=>{
+  const config={initialMask:1,specific:0,one:.2,two:.4,removal:.7};
+  const plain=calculate([.2,.3],config).results;
+  const original=calculate([.2,.3],{...config,removableCraft:true}).results;
+  for(const i of [1,2]) {
+    close(original[i].cost,plain[i].cost+.7);
+    close(original[i].removals,plain[i].removals+1);
+    close(original[i].rolls,plain[i].rolls);
+    close(original[i].crafts,plain[i].crafts);
+  }
+});
+
+test('removal is weighted by reaching a first lock, and optimizer accounts for it',()=>{
+  // From no targets: first relevant event is mod 1 hitting. If mod 2
+  // also hits (30%), finish without ever removing the original craft.
+  const config={specific:0,one:.2,removal:.7};
+  const plain=calculate([.2,.3],config).results[1];
+  const original=calculate([.2,.3],{...config,removableCraft:true}).results[1];
+  close(original.cost-plain.cost,.7*.7);
+  close(original.removals-plain.removals,.7);
+  for(const removal of [0,.2,10,1000])for(const initialMask of [0,1,2]) {
+    const r=calculate([.1,.2,.3],{removableCraft:true,removal,initialMask}).results;
+    for(const other of r.slice(0,3))assert.ok(r[3].cost<=other.cost+1e-6);
   }
 });

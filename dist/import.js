@@ -91,9 +91,14 @@ export function parseItem(text) {
   const banks = {};
   for (const side of ['prefix','suffix']) {
     const opposite = side === 'prefix' ? 'suffix' : 'prefix';
-    const canCraft = sides[opposite].length < 3 && !anyCraft;
-    const reason = sides[opposite].length === 3 ? `All three ${opposite} slots are occupied. Lock strategies need a free ${opposite} slot.` : anyCraft ? 'An existing bench craft prevents adding a lock in this model. Remove it and re-copy the item to compare locks.' : '';
-    banks[side] = {mods:sides[side],canCraft,reason,initialCraft:0,specific:Math.max(0,sides[side].findIndex(m => !m.fractured))};
+    const removable = sides[opposite].filter(m => m.crafted && !m.fractured);
+    const removableCraft = removable.length > 0 && !sides[side].some(m => m.crafted) && !sides[opposite].some(m => m.crafted && m.fractured);
+    const canCraft = removableCraft || (sides[opposite].length < 3 && !anyCraft);
+    const reason = removableCraft
+      ? `Assumes the crafted ${opposite} (${removable.map(m => m.name).join('; ')}) is removed when the first lock is applied. Its removal is charged once using the removal cost below. No-lock keeps it; recrafting it afterward is not included.`
+      : anyCraft ? 'An existing craft cannot be removed without affecting a target or fixed modifier. Lock strategies are unavailable for this side.'
+      : sides[opposite].length === 3 ? `All three ${opposite} slots are occupied. Lock strategies need a free ${opposite} slot.` : '';
+    banks[side] = {mods:sides[side],canCraft,removableCraft,reason,initialCraft:0,specific:Math.max(0,sides[side].findIndex(m => !m.fractured))};
   }
   notes.add('Targets default to the highest numeric values. Change the target rule for stats where lower is better.');
   return {itemName,itemFlags,banks,notes:[...notes]};
