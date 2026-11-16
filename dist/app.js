@@ -1,6 +1,6 @@
-import { probabilities, calculate, fractureMask, isFixed } from './engine.js';
-import { parseItem, atTarget, EXAMPLE_ITEM } from './import.js';
-import { buildGuide } from './guide.js';
+import { probabilities, calculate, fractureMask, isFixed } from './engine.js?v=20261116-5';
+import { parseItem, atTarget, EXAMPLE_ITEM } from './import.js?v=20261116-5';
+import { buildGuide } from './guide.js?v=20261116-5';
 const $ = id => document.getElementById(id);
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => n >= 1e7 ? n.toExponential(3) : n.toLocaleString('en-US', {maximumFractionDigits:2});
