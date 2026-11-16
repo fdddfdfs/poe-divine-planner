@@ -167,3 +167,24 @@ test('specific two-lock matches independently audited warstaff expectations',()=
   close(c.results.find(r=>r.id==='optimal').cost,800.8383308480562);
   assert.equal(calculate([.2,.3],{initialMask:1}).results.find(r=>r.id==='specific2').crafts,0);
 });
+
+test('All expands both specific-lock strategies without changing individual results',()=>{
+  for(const ps of [[.1,.2,.3],[1,1/8,1/182],[1,1,1]]) {
+    const settings={specific:'all',removableCraft:true,removal:.2,initialMask:1};
+    const expanded=calculate(ps,settings);
+    const eligible=ps.map((p,i)=>p<1?i:null).filter(i=>i!==null);
+    assert.equal(expanded.results.length,3+2*Math.max(1,eligible.length));
+    for(const id of ['specific','specific2']) {
+      const rows=expanded.results.filter(r=>r.id===id);
+      assert.deepEqual(rows.map(r=>r.modifierIndex),eligible.length?eligible:[null]);
+      for(const row of rows) {
+        if(row.modifierIndex===null){close(row.cost,0);continue;}
+        const single=calculate(ps,{...settings,specific:row.modifierIndex}).results.find(r=>r.id===id);
+        for(const metric of ['cost','rolls','crafts','removals'])close(row[metric],single[metric]);
+      }
+    }
+    const single=calculate(ps,{...settings,specific:0});
+    for(const id of ['none','all','optimal'])close(expanded.results.find(r=>r.id===id).cost,single.results.find(r=>r.id===id).cost);
+  }
+  assert.throws(()=>calculate([.1,.2],{specific:'invalid'}),/starting state/);
+});

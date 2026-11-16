@@ -9,3 +9,5 @@
 .guide-link{display:inline-block;margin-top:14px;font-size:12px;font-weight:600}.guide{scroll-margin-top:20px}
 
 .strategy-optimal{border-color:#799c68;background:#1e2d20}.strategy-optimal .cost-bar>div{background:var(--green)}.strategy-badge{display:inline-block;margin-top:7px;padding:3px 6px;border:1px solid #59754d;border-radius:4px;color:var(--green);font-size:8px;letter-spacing:1px}
+
+.comparison-scope{margin-bottom:14px}

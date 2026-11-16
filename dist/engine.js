@@ -85,7 +85,7 @@ export function calculate(ps, settings = {}) {
   const width = n + Number(originalCraft >= 0);
   const startCraft = originalCraft >= 0 && initialCraft === 0 ? originalCraft : initialCraft;
   const nextCraft = (craft, action) => craft === originalCraft && action === 0 ? originalCraft : action;
-  if (!Number.isInteger(initialMask) || initialMask < 0 || initialMask > goal || !actions.includes(initialCraft) || !Number.isInteger(specific) || specific < 0 || specific >= n) throw new Error('Invalid starting state.');
+  if (!Number.isInteger(initialMask) || initialMask < 0 || initialMask > goal || !actions.includes(initialCraft) || (specific !== 'all' && (!Number.isInteger(specific) || specific < 0 || specific >= n))) throw new Error('Invalid starting state.');
   const forced = ps.reduce((m, p, i) => p === 1 ? m | (1 << i) : m, 0);
   const startMask = initialMask | forced;
   const states = Array.from({length: goal * width}, (_, id) => ({mask: Math.floor(id / width), craft: id % width}));
@@ -127,8 +127,7 @@ export function calculate(ps, settings = {}) {
     return {id, ...values, policy, next: startMask === goal ? null : policy[startMask * width + startCraft]};
   }
   const none = states.map(() => 0);
-  const specificPolicy = k => states.map(s => canCraft && n > k && !(forced & (1 << specific)) && (s.mask & (1 << specific)) ? k : 0);
-  const chosen = specificPolicy(1), chosenTwo = specificPolicy(2);
+  const specificPolicy = (k, index) => states.map(s => canCraft && n > k && !(forced & (1 << index)) && (s.mask & (1 << index)) ? k : 0);
   const all = states.map(s => canCraft ? Math.min(popcount(s.mask & ~forced), n - 1) : 0);
   const best = [...none];
   let iterations = 0;
@@ -148,6 +147,11 @@ export function calculate(ps, settings = {}) {
     if (!changed) break;
   }
   if (iterations === 100) throw new Error('Optimizer did not converge. Try less extreme inputs.');
-  const results = [result('none', none), result('specific', chosen), result('specific2', chosenTwo), result('all', all), result('optimal', best)];
+  const selections = specific === 'all' ? actions.filter(i=>!(forced & (1 << i))) : [specific];
+  const specificResults = [1,2].flatMap(k => (selections.length ? selections : [null]).map(index=>({
+    ...result(k === 1 ? 'specific' : 'specific2', index === null ? none : specificPolicy(k,index)),
+    modifierIndex:index
+  })));
+  const results = [result('none', none), ...specificResults, result('all', all), result('optimal', best)];
   return { results, states, goal, startMask, width, ps, policy: best, originalCraft, forced };
 }

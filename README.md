@@ -12,6 +12,8 @@ The importer checks opposite-side slot availability and existing bench crafts. A
 
 Choose prefixes or suffixes, include **all modifiers on that side**, enter the raw roll ranges from your item, and choose targets. Names are editable with a small suggestion list; this is not a tier/mod database. The default demo is Oblivion Beak, a Synthesised Despot Axe, using its supplied current rolls and ranges. Reset demo and Try example load the same item; saved personal setups still restore on reload. Multiple numeric rolls in a hybrid belong under the **same modifier**. Check “Already at target” only if every numeric target on that modifier is currently met. For a modifier you don't care about, set its target to the minimum with “At least” so every roll qualifies, but keep it listed as a candidate for the random lock.
 
+**All modifiers** is the default comparison selection. It shows separate 1-lock and 2-lock results for every eligible modifier, plus no lock, lock all targets and optimal adaptive once each. Choose one modifier to narrow the two specific-lock strategies. Every result still aims to complete all targets on the selected side. Fixed and always-satisfied modifiers are excluded from the expanded comparisons.
+
 The comparison covers:
 
 - No lock: reroll until all targets are met simultaneously.
