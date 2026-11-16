@@ -17,7 +17,7 @@ test('wand guide covers all variable outcomes and uses the actual optimal policy
   const hit=guide.rows.find(r=>r.mask===3);
   const original=hit.groups.flatMap(g=>g.instructions).find(i=>i.craft===3);
   assert.match(original.text,/Remove the crafted suffix/);
-  assert.match(original.text,/2-mod prefix lock/);
+  assert.match(original.text,/2 prefixes cannot be changed/);
   const completed=guide.rows.at(-1).groups[0].instructions;
   assert.match(completed.find(i=>i.craft===3).text,/no more Divines/);
   assert.doesNotMatch(completed.find(i=>i.craft===3).text,/Remove/);

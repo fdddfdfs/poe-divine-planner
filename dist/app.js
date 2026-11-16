@@ -1,6 +1,6 @@
-import { probabilities, calculate, fractureMask, isFixed } from './engine.js?v=20261116-6';
-import { parseItem, atTarget, EXAMPLE_ITEM } from './import.js?v=20261116-6';
-import { buildGuide } from './guide.js?v=20261116-6';
+import { probabilities, calculate, fractureMask, isFixed } from './engine.js?v=20261116-7';
+import { parseItem, atTarget, EXAMPLE_ITEM } from './import.js?v=20261116-7';
+import { buildGuide, benchCraftName } from './guide.js?v=20261116-7';
 const $ = id => document.getElementById(id);
 const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => n >= 1e7 ? n.toExponential(3) : n.toLocaleString('en-US', {maximumFractionDigits:2});
@@ -59,9 +59,10 @@ function renderMods() {
   renderSettings();
 }
 function renderSettings() {
+  document.querySelectorAll("[data-craft-name]").forEach(el => { el.textContent = benchCraftName(Number(el.dataset.craftName), state.side); });
   if (state.specific !== 'all' && isFixed(state.mods[state.specific] || {rolls:[]})) state.specific='all';
   for (const key of ['one','two','removal']) $(key).value = state[key];
-  $('current-craft').innerHTML = state.mods.map((_,i) => `<option value="${i}" ${state.initialCraft === i ? 'selected' : ''}>${i ? `${i}-mod lock` : 'No lock'}</option>`).join('');
+  $('current-craft').innerHTML = state.mods.map((_,i) => `<option value="${i}" ${state.initialCraft === i ? 'selected' : ''}>${i ? benchCraftName(i, state.side) : 'No lock'}</option>`).join('');
   $('current-craft').disabled = state.canCraft === false;
   renderSpecific();
 }
@@ -73,7 +74,7 @@ function renderSpecific() {
 function fixedModifierMarkup(mod,i) {
   return `<article class="mod fractured-mod" data-mod="${i}"><div class="mod-head"><span class="mod-id">${state.side === 'prefix' ? 'P' : 'S'}${i+1}</span><label class="mod-name"><input data-field="name" aria-label="Modifier ${i+1} name" value="${esc(mod.name)}" maxlength="120"></label><button class="remove" data-action="remove" aria-label="Remove modifier ${i+1}" ${state.mods.length === 1 ? 'disabled' : ''}>×</button></div><label class="check fracture-toggle"><input type="checkbox" data-field="fractured" checked>Fractured · fixed</label>${mod.source ? `<p class="copied-stat">${esc(mod.source)}</p>` : ''}<p class="fracture-values">Fixed value${mod.rolls.length > 1 ? 's' : ''}: ${mod.rolls.map(r=>esc(r.current ?? r.target)).join(' / ')}</p><p class="hint">Excluded from Divine targets. Still occupies an affix slot and can receive a random lock.</p><span class="chance" id="chance-${i}"></span></article>`;
 }
-const actionName = k => k ? `${k}-mod lock` : 'No lock';
+const actionName = k => k ? benchCraftName(k, state.side) : 'No lock';
 function renderGuide(calculation) {
   const guide = buildGuide(calculation,state.mods,state);
   const name = i => `${state.side === 'prefix' ? 'P' : 'S'}${i+1} · ${state.mods[i].name}`;
@@ -83,7 +84,7 @@ function renderGuide(calculation) {
     const title = row.complete ? 'All targets met' : !row.hit.length ? 'No targets met' : `Only ${row.hit.map(i=>name(i)).join(' + ')} at target`;
     const uniform = row.groups.length === 1;
     const action = row.groups[0].action;
-    const simple = row.complete ? 'Stop Divining. Remove any remaining lock craft.' : action === 0 ? 'Use one Divine without a lock. Remove an existing lock first.' : `Use a ${guide.lock(action)}, then one Divine. Keep that lock if already applied; otherwise ${state.removableCraft ? 'remove the original bench craft if still present, or any different lock, and apply it.' : 'remove any different lock and apply it.'}`;
+    const simple = row.complete ? 'Stop Divining. Remove any remaining lock craft.' : action === 0 ? 'Use one Divine without a lock. Remove an existing lock first.' : `Use “${guide.lock(action)}”, then one Divine. Keep that lock if already applied; otherwise ${state.removableCraft ? 'remove the original bench craft if still present, or any different lock, and apply it.' : 'remove any different lock and apply it.'}`;
     return `<article class="guide-outcome${row.complete ? ' guide-done' : ''}"><h3>${esc(title)}</h3>${row.missed.length ? `<p class="guide-missed">Still needed: ${row.missed.map(i=>esc(name(i))).join('; ')}</p>` : ''}${uniform ? `<p>${esc(simple)}</p>` : `<ul class="guide-branches">${row.groups.flatMap(g=>g.instructions).map(instruction=>`<li><b>${esc(instruction.label)}:</b> ${esc(instruction.text)}</li>`).join('')}</ul>`}</article>`;
   }).join('')}</div></li><li><strong>Repeat until every target is met.</strong><p>Use one Divine at a time, check the result, and follow the matching instruction again. ${state.removableCraft ? 'Recrafting the original bench modifier afterward is not included in the cost.' : ''}</p></li></ol>`;
 }
@@ -105,25 +106,25 @@ function update() {
     const saving = none.cost > 0 ? Math.max(0, (1-best.cost/none.cost)*100) : 0;
     let next;
     if (startMask === goal) next = state.initialCraft ? 'All targets are met. Remove the remaining craft; no more Divines needed.' : 'All targets are met. You are done; no Divines needed.';
-    else if (best.next === state.initialCraft) next = `${best.next ? `Keep the ${best.next}-mod lock` : 'Leave the item unlocked'}, use a Divine, then re-check your targets.`;
-    else next = `${state.initialCraft ? 'Remove the current craft. ' : state.removableCraft && best.next ? `Remove the crafted ${state.side === 'prefix' ? 'suffix' : 'prefix'}. ` : ''}${best.next ? `Apply the ${best.next}-mod lock` : 'Leave the item unlocked'}, then use a Divine.`;
+    else if (best.next === state.initialCraft) next = `${best.next ? `Keep “${actionName(best.next)}”` : 'Leave the item unlocked'}, use a Divine, then re-check your targets.`;
+    else next = `${state.initialCraft ? 'Remove the current craft. ' : state.removableCraft && best.next ? `Remove the crafted ${state.side === 'prefix' ? 'suffix' : 'prefix'}. ` : ''}${best.next ? `Apply “${actionName(best.next)}”` : 'Leave the item unlocked'}, then use a Divine.`;
     $('error').hidden = true;
     $('output').hidden = false;
     const descriptions = {
       none:['No lock','Reroll until every target hits on the same Divine.'],
-      specific:['Lock specific with 1-lock','Use a 1-mod craft while the chosen modifier is at target. Random protection still applies.'],
-      specific2:['Lock specific with 2-lock','Use a 2-mod craft while the chosen modifier is at target. Random protection still applies.'],
-      all:['Lock all targets','Use 1- or 2-mod protection according to the number of variable targets currently met. Fixed and always-satisfied modifiers do not trigger locks.'],
-      optimal:['Optimal adaptive',state.canCraft === false ? 'Uses no lock while lock crafting is unavailable. This is the strategy behind the top estimate.' : 'Chooses no lock, a 1-mod lock or a 2-mod lock after each roll, accounting for targets met and the current craft. This is the strategy behind the top estimate.']
+      specific:[actionName(1),''],
+      specific2:[actionName(2),''],
+      all:['Lock all targets',`Use “${actionName(1)}” or “${actionName(2)}” according to the number of variable targets currently met. Fixed and always-satisfied modifiers do not trigger locks.`],
+      optimal:['Optimal adaptive',state.canCraft === false ? 'Uses no lock while lock crafting is unavailable. This is the strategy behind the top estimate.' : `Chooses no lock, “${actionName(1)}” or “${actionName(2)}” after each roll, accounting for targets met and the current craft. This is the strategy behind the top estimate.`]
     };
     const cardTitle = r => descriptions[r.id][0] + (state.specific === 'all' && Number.isInteger(r.modifierIndex) ? ` · ${state.side === 'prefix' ? 'P' : 'S'}${r.modifierIndex+1}` : '');
     const cardDescription = r => ['specific','specific2'].includes(r.id)
-      ? Number.isInteger(r.modifierIndex) ? `Use a ${r.id === 'specific' ? 1 : 2}-mod craft while “${state.mods[r.modifierIndex].name}” is at target. Random protection still applies.` : 'No variable targets to protect; every modifier is already satisfied.'
+      ? Number.isInteger(r.modifierIndex) ? `Apply “${actionName(r.id === 'specific' ? 1 : 2)}” while “${state.mods[r.modifierIndex].name}” is at target. Random protection still applies.` : 'No variable targets to protect; every modifier is already satisfied.'
       : descriptions[r.id][1];
     const max = Math.max(...results.map(r=>r.cost), .001);
-    $('output').innerHTML = `<div class="recommendation"><span class="eyebrow">LOWEST EXPECTED COST · ADAPTIVE STRATEGY</span><h3>${startMask === goal ? 'No Divine rolls needed.' : saving > .05 ? 'Let the math choose your locks.' : 'No lock is already cost-optimal.'}</h3><div class="big-number">${fmt(best.cost)}<span>Divines on average</span></div><p>${saving > .05 ? `${fmt(saving)}% less than plain Divining. ` : ''}${fmt(best.rolls)} Divine rolls + ${fmt(Math.max(0,best.cost-best.rolls))} Divines in crafting costs.</p><div class="next-step"><strong>YOUR NEXT MOVE</strong>${esc(next)}</div><a class="guide-link" href="#guide">Follow the step-by-step guide ↓</a></div><p class="compare-title">FIVE STRATEGY TYPES / EXPECTED TOTAL COST</p>${state.specific === 'all' ? '<p class="hint comparison-scope">Showing both specific-lock strategies for every variable target. Every result aims to finish all targets on this side.</p>' : ''}${results.map(r => (state.canCraft === false && ["specific","specific2","all"].includes(r.id)) || (r.id === "specific2" && state.mods.length < 3) ? `<article class="strategy unavailable"><h3>${esc(cardTitle(r))}</h3><p>${r.id === "specific2" && state.mods.length < 3 ? "Requires three modifiers on this side: a 2-lock would protect every modifier and prevent progress." : "Unavailable on this item: a lock craft cannot currently be applied."}</p></article>` : `<article class="strategy${r.id === 'optimal' ? ' strategy-optimal' : ''}"><div class="strategy-top"><div><h3>${esc(cardTitle(r))}</h3>${r.id === 'optimal' ? '<span class="strategy-badge">TOP ESTIMATE</span>' : ''}</div><div class="strategy-cost">${fmt(r.cost)}<span>Divines total</span></div></div><p>${esc(cardDescription(r))}</p><div class="metrics"><span>${fmt(r.rolls)} Divine rolls</span><span>${fmt(r.crafts)} craft applications</span><span>${fmt(r.removals)} removals</span></div><div class="cost-bar"><div style="width:${100*r.cost/max}%"></div></div></article>`).join('')}<p class="budget-note">Plain-roll success: <strong>${pct(ps.reduce((a,b)=>a*b,1))}</strong>. Costs include rolls, craft changes and final removal. Averages can hide long unlucky streaks.</p>`;
+    $('output').innerHTML = `<div class="recommendation"><span class="eyebrow">LOWEST EXPECTED COST · ADAPTIVE STRATEGY</span><h3>${startMask === goal ? 'No Divine rolls needed.' : saving > .05 ? 'Let the math choose your locks.' : 'No lock is already cost-optimal.'}</h3><div class="big-number">${fmt(best.cost)}<span>Divines on average</span></div><p>${saving > .05 ? `${fmt(saving)}% less than plain Divining. ` : ''}${fmt(best.rolls)} Divine rolls + ${fmt(Math.max(0,best.cost-best.rolls))} Divines in crafting costs.</p><div class="next-step"><strong>YOUR NEXT MOVE</strong>${esc(next)}</div><a class="guide-link" href="#guide">Follow the step-by-step guide ↓</a></div><p class="compare-title">FIVE STRATEGY TYPES / EXPECTED TOTAL COST</p>${state.specific === 'all' ? '<p class="hint comparison-scope">Showing both specific-lock strategies for every variable target. Every result aims to finish all targets on this side.</p>' : ''}${results.map(r => (state.canCraft === false && ["specific","specific2","all"].includes(r.id)) || (r.id === "specific2" && state.mods.length < 3) ? `<article class="strategy unavailable"><h3>${esc(cardTitle(r))}</h3><p>${r.id === "specific2" && state.mods.length < 3 ? `Requires three modifiers on this side: “${actionName(2)}” would protect every modifier and prevent progress.` : "Unavailable on this item: a lock craft cannot currently be applied."}</p></article>` : `<article class="strategy${r.id === 'optimal' ? ' strategy-optimal' : ''}"><div class="strategy-top"><div><h3>${esc(cardTitle(r))}</h3>${r.id === 'optimal' ? '<span class="strategy-badge">TOP ESTIMATE</span>' : ''}</div><div class="strategy-cost">${fmt(r.cost)}<span>Divines total</span></div></div><p>${esc(cardDescription(r))}</p><div class="metrics"><span>${fmt(r.rolls)} Divine rolls</span><span>${fmt(r.crafts)} craft applications</span><span>${fmt(r.removals)} removals</span></div><div class="cost-bar"><div style="width:${100*r.cost/max}%"></div></div></article>`).join('')}<p class="budget-note">Plain-roll success: <strong>${pct(ps.reduce((a,b)=>a*b,1))}</strong>. Costs include rolls, craft changes and final removal. Averages can hide long unlucky streaks.</p>`;
     const columns = Array.from({length:width},(_,i)=>i);
-    const headings = columns.map(i => `<th>${i === originalCraft ? 'Original craft present' : i ? `With ${i}-mod lock` : state.removableCraft ? 'After removal, no lock' : 'With no lock'}</th>`).join('');
+    const headings = columns.map(i => `<th>${i === originalCraft ? 'Original craft present' : i ? `With “${actionName(i)}”` : state.removableCraft ? 'After removal, no lock' : 'With no lock'}</th>`).join('');
     $('policy').innerHTML = `<table><thead><tr><th>Targets met</th>${headings}</tr></thead><tbody>${Array.from({length:goal},(_,mask)=>mask).filter(mask=>(mask & forced) === forced).map(mask=>`<tr><td>${state.mods.map((m,i)=>!(forced & (1<<i)) && (mask&(1<<i))?`${state.side === 'prefix' ? 'P' : 'S'}${i+1}`:null).filter(Boolean).join(' + ') || 'None'}</td>${columns.map(k=>`<td>${k === originalCraft && policy[mask*width+k] ? 'Remove craft → ' : ''}${actionName(policy[mask*width+k])}</td>`).join('')}</tr>`).join('')}<tr><td>All Divine targets</td><td colspan="${width}">Stop; remove any lock craft.</td></tr></tbody></table>`;
     renderGuide(calculation);
     save();
