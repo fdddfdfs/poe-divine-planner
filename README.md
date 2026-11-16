@@ -21,6 +21,8 @@ The comparison covers:
 
 “Specific” and “all” describe when to use a craft. **Neither guarantees which modifiers get protected.** Locks choose a fresh uniform subset of distinct modifiers on each Divine. A craft persists between rolls and is paid for again only on a change. Costs include craft removal on replacement and final cleanup. The default zero removal price ignores the small currency cost; enter its Divine equivalent to include it.
 
+The **What to do after each roll** guide translates the optimal policy into step-by-step instructions: your first move, named targets (including every hybrid roll), an action for each possible target outcome, and when to stop. If the optimal action depends on the craft already present, it lists each case. It updates with targets and prices, and omits impossible outcomes for fractured or always-satisfied modifiers.
+
 ## Model and limits
 
 This implementation uses the random-per-Divine behavior explicitly confirmed by the requester. The public FAQ describes random protection for removing currency; that alone is not proof of every Divine interaction. Confirm behavior in-game following patches.
