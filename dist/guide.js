@@ -30,6 +30,6 @@ export function buildGuide(calculation, mods, settings) {
     rows.push({mask,hit,missed,complete:mask === goal,groups});
   }
   const startCraft = originalCraft >= 0 && !settings.initialCraft ? originalCraft : settings.initialCraft || 0;
-  const first = instruction(calculation.results[3].next,startCraft);
+  const first = instruction(calculation.results.find(r=>r.id === 'optimal').next,startCraft);
   return {rows,variable,first,lock};
 }

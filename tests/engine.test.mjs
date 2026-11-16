@@ -43,7 +43,7 @@ test('optimal policy is no more expensive than each fixed strategy across inputs
     for(const initialMask of [0,(1<<ps.length)-1])
       for(const one of [0,1,100]){
         const r=calculate(ps,{one,two:one*2,initialMask,removal:.2}).results;
-        for(const other of r.slice(0,3))assert.ok(r[3].cost<=other.cost+1e-6);
+        for(const other of r.slice(0,4))assert.ok(r[4].cost<=other.cost+1e-6);
       }
 });
 test('reject impossible or numerically unreliable inputs',()=>{
@@ -74,11 +74,11 @@ test('fractures never change but remain eligible for random partial locks',()=>{
 test('target-count and specific strategies do not lock merely because a fracture is fixed',()=>{
   const result=calculate([1,.2,.3],{fracturedMask:1,specific:0,initialMask:1});
   assert.equal(result.results[1].next,0);
-  assert.equal(result.results[2].next,0);
+  assert.equal(result.results[3].next,0);
   const oneHit=calculate([1,.2,.3],{fracturedMask:1,specific:1,initialMask:3});
-  assert.equal(oneHit.results[2].next,1);
+  assert.equal(oneHit.results[3].next,1);
 });
-test('independent seeded Monte Carlo agrees with all four policy expectations',()=>{
+test('independent seeded Monte Carlo agrees with all five policy expectations',()=>{
   for (const fracturedMask of [0,1]) for (const removableCraft of [false,true]) {
   const ps=[.25,.5,.2], config={one:1,two:2,removal:.1,specific:2,fracturedMask,removableCraft};
   const expected=calculate(ps,config);
@@ -123,7 +123,7 @@ test('first lock removes original craft once, not on subsequent craft switches',
   const config={initialMask:1,specific:0,one:.2,two:.4,removal:.7};
   const plain=calculate([.2,.3],config).results;
   const original=calculate([.2,.3],{...config,removableCraft:true}).results;
-  for(const i of [1,2]) {
+  for(const i of [1,3]) {
     close(original[i].cost,plain[i].cost+.7);
     close(original[i].removals,plain[i].removals+1);
     close(original[i].rolls,plain[i].rolls);
@@ -141,6 +141,29 @@ test('removal is weighted by reaching a first lock, and optimizer accounts for i
   close(original.removals-plain.removals,.7);
   for(const removal of [0,.2,10,1000])for(const initialMask of [0,1,2]) {
     const r=calculate([.1,.2,.3],{removableCraft:true,removal,initialMask}).results;
-    for(const other of r.slice(0,3))assert.ok(r[3].cost<=other.cost+1e-6);
+    for(const other of r.slice(0,4))assert.ok(r[4].cost<=other.cost+1e-6);
   }
+});
+
+
+test('fixed-value modifiers are satisfied but never trigger specific or target-count locks',()=>{
+  const c=calculate([1,1/8,1/182],{initialMask:1,specific:0});
+  assert.deepEqual(c.results.map(r=>r.id),['none','specific','specific2','all','optimal']);
+  assert.equal(c.results.find(r=>r.id==='specific').next,0);
+  assert.equal(c.results.find(r=>r.id==='specific2').next,0);
+  assert.equal(c.results.find(r=>r.id==='all').next,0);
+  const oneHit=calculate([1,1/8,1/182],{initialMask:3,specific:1});
+  assert.equal(oneHit.results.find(r=>r.id==='all').next,1);
+  assert.equal(oneHit.results.find(r=>r.id==='specific2').next,2);
+  // The constant prefix is still one of the three random lock candidates.
+  close(transition([1,1/8,1/182],5,2)[7],1/24);
+});
+
+test('specific two-lock matches independently audited warstaff expectations',()=>{
+  const c=calculate([1,1/8,1/182],{initialMask:1,specific:2});
+  const r=c.results.find(r=>r.id==='specific2');
+  close(r.rolls,827.7741046831956);close(r.crafts,3.9290633608815426);
+  close(r.cost,835.6322314049587);
+  close(c.results.find(r=>r.id==='optimal').cost,800.8383308480562);
+  assert.equal(calculate([.2,.3],{initialMask:1}).results.find(r=>r.id==='specific2').crafts,0);
 });

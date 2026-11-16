@@ -15,8 +15,9 @@ Choose prefixes or suffixes, include **all modifiers on that side**, enter the r
 The comparison covers:
 
 - No lock: reroll until all targets are met simultaneously.
-- Specific modifier: use a one-mod craft while the selected modifier meets its target; remove it when the target is lost.
-- All target rolls: use one-/two-mod protection while one/two modifiers meet their targets.
+- Specific modifier with 1-lock: use a one-mod craft while the selected variable modifier meets its target; remove it when the target is lost.
+- Specific modifier with 2-lock: use a two-mod craft under the same rule. Requires three modifiers on the selected side so the lock permits progress.
+- All target rolls: use one-/two-mod protection while one/two variable modifiers meet their targets. Fixed and always-satisfied modifiers do not trigger locks.
 - Optimal adaptive policy: minimize expected total cost by choosing among no craft and the one-/two-mod crafts at each state.
 
 “Specific” and “all” describe when to use a craft. **Neither guarantees which modifiers get protected.** Locks choose a fresh uniform subset of distinct modifiers on each Divine. A craft persists between rolls and is paid for again only on a change. Costs include craft removal on replacement and final cleanup. The default zero removal price ignores the small currency cost; enter its Divine equivalent to include it.
@@ -52,7 +53,7 @@ npm start
 
 Open http://127.0.0.1:4173. Static files are in `dist/`. GitHub Actions runs the math tests and deploys only that directory to Pages. Enable GitHub Pages with **GitHub Actions** as its source.
 
-Tests cover inclusive/decimal ranges, hybrid grouping, random protection, geometric expectations, starting crafts/completed states, numerical guards, optimal-cost dominance and an independent seeded Monte Carlo cross-check for all four strategies.
+Tests cover inclusive/decimal ranges, hybrid grouping, random protection, geometric expectations, starting crafts/completed states, numerical guards, optimal-cost dominance and an independent seeded Monte Carlo cross-check for all five strategies.
 
 The UI stores setups in localStorage. Share links encode the setup in the URL fragment, which is not sent to the server. There is no backend, analytics, login or API key. Google Fonts is the only external visual resource; system fonts are the fallback.
 
@@ -65,3 +66,5 @@ The UI stores setups in localStorage. Share links encode the setup in the URL fr
 - [Advanced item clipboard format research](https://github.com/timeloop-vault/poe-inspect/blob/main/docs/research/item-format-and-data.md)
 
 Fan-made; not affiliated with Grinding Gear Games. No game art is included.
+
+The independent warstaff audit (`python scripts/audit_warstaff.py`) uses exact rational arithmetic, checks all five strategy metrics, and verifies optimal actions in every state.

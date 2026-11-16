@@ -44,9 +44,9 @@ test('crafted modifiers count and prevent invalid lock recommendations',()=>{
   assert.equal(parsed.banks.prefix.canCraft,false);assert.equal(parsed.banks.suffix.canCraft,true);
   assert.equal(parsed.banks.suffix.removableCraft,true);
   const result=calculate([.1,.05,.1],{canCraft:false}).results;
-  assert.ok(Math.abs(result[3].cost-2000)<1e-6);
-  assert.equal(result[3].crafts,0);
-  assert.ok(result[3].policy.every(k=>k===0));
+  assert.ok(Math.abs(result[4].cost-2000)<1e-6);
+  assert.equal(result[4].crafts,0);
+  assert.ok(result[4].policy.every(k=>k===0));
 });
 test('target changes re-evaluate copied values including lower-is-better',()=>{
   const mod=parseItem(EXAMPLE_ITEM).banks.prefix.mods[0];

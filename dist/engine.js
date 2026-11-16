@@ -1,6 +1,7 @@
 // Exact finite-state expectations; no simulation is used in the calculator.
 export const popcount = n => n.toString(2).replaceAll('0', '').length;
 export const fractureMask = mods => mods.reduce((mask, mod, i) => mod.fractured ? mask | (1 << i) : mask, 0);
+export const isFixed = mod => !!mod.fractured || mod.rolls.every(r => r.min === r.max);
 
 export function rollProbability(roll) {
   const { min, max, step, target, direction } = roll;
@@ -126,8 +127,9 @@ export function calculate(ps, settings = {}) {
     return {id, ...values, policy, next: startMask === goal ? null : policy[startMask * width + startCraft]};
   }
   const none = states.map(() => 0);
-  const chosen = states.map(s => canCraft && n > 1 && !(fracturedMask & (1 << specific)) && (s.mask & (1 << specific)) ? 1 : 0);
-  const all = states.map(s => canCraft ? Math.min(popcount(s.mask & ~fracturedMask), n - 1) : 0);
+  const specificPolicy = k => states.map(s => canCraft && n > k && !(forced & (1 << specific)) && (s.mask & (1 << specific)) ? k : 0);
+  const chosen = specificPolicy(1), chosenTwo = specificPolicy(2);
+  const all = states.map(s => canCraft ? Math.min(popcount(s.mask & ~forced), n - 1) : 0);
   const best = [...none];
   let iterations = 0;
   for (; iterations < 100; iterations++) {
@@ -146,6 +148,6 @@ export function calculate(ps, settings = {}) {
     if (!changed) break;
   }
   if (iterations === 100) throw new Error('Optimizer did not converge. Try less extreme inputs.');
-  const results = [result('none', none), result('specific', chosen), result('all', all), result('optimal', best)];
-  return { results, states, goal, startMask, width, ps, policy: best, originalCraft };
+  const results = [result('none', none), result('specific', chosen), result('specific2', chosenTwo), result('all', all), result('optimal', best)];
+  return { results, states, goal, startMask, width, ps, policy: best, originalCraft, forced };
 }

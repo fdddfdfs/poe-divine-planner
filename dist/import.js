@@ -98,7 +98,7 @@ export function parseItem(text) {
       ? `Assumes the crafted ${opposite} (${removable.map(m => m.name).join('; ')}) is removed when the first lock is applied. Its removal is charged once using the removal cost below. No-lock keeps it; recrafting it afterward is not included.`
       : anyCraft ? 'An existing craft cannot be removed without affecting a target or fixed modifier. Lock strategies are unavailable for this side.'
       : sides[opposite].length === 3 ? `All three ${opposite} slots are occupied. Lock strategies need a free ${opposite} slot.` : '';
-    banks[side] = {mods:sides[side],canCraft,removableCraft,reason,initialCraft:0,specific:Math.max(0,sides[side].findIndex(m => !m.fractured))};
+    banks[side] = {mods:sides[side],canCraft,removableCraft,reason,initialCraft:0,specific:Math.max(0,sides[side].findIndex(m => !m.fractured && m.rolls.some(r=>r.min !== r.max)))};
   }
   notes.add('Targets default to the highest numeric values. Change the target rule for stats where lower is better.');
   return {itemName,itemFlags,banks,notes:[...notes]};
