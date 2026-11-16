@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseItem,atTarget,EXAMPLE_ITEM} from '../dist/import.js';
+import {parseItem,atTarget,EXAMPLE_ITEM as AXE_DEMO} from '../dist/import.js';
+import {EXAMPLE_ITEM} from './fixtures.mjs';
 import {probabilities,calculate} from '../dist/engine.js';
 const item = stats => `Item Class: Wands\nRarity: Rare\nDoom Branch\nImbued Wand\n--------\nItem Level: 85\n--------\n${stats}`;
 test('full advanced item: both sides, current rolls, hybrid grouping and implicit exclusion',()=>{
@@ -104,4 +105,19 @@ test('full suffixes with crafted Double Damage allow prefix locks without droppi
   const fixed=parseItem(text.replace('Master Crafted Suffix','Fractured Master Crafted Suffix'));
   assert.equal(fixed.banks.prefix.canCraft,false);
   assert.equal(fixed.banks.prefix.removableCraft,false);
+});
+
+
+test('Oblivion Beak demo preserves current rolls, hybrid grouping and removable suffix',()=>{
+  const item=parseItem(AXE_DEMO), p=item.banks.prefix;
+  assert.equal(item.itemName,'Oblivion Beak');
+  assert.deepEqual(item.itemFlags,['Mirrored']);
+  assert.equal(p.mods.length,3);assert.equal(item.banks.suffix.mods.length,3);
+  assert.deepEqual(p.mods.map(m=>m.rolls.map(r=>r.current)),[[178],[79,184],[47,84]]);
+  assert.deepEqual(p.mods.map(m=>m.hit),[false,false,true]);
+  assert.equal(p.canCraft,true);assert.equal(p.removableCraft,true);
+  const ps=probabilities(p.mods);
+  [1/10,1/130,1/182].forEach((expected,i)=>assert.ok(Math.abs(ps[i]-expected)<1e-12));
+  const result=calculate(ps,{...p,initialMask:4}).results;
+  assert.ok(result.every(r=>Number.isFinite(r.cost)&&r.cost>0));
 });

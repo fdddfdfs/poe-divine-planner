@@ -10,10 +10,14 @@ const templates = {
   prefix: ['Maximum Life', 'Increased Physical Damage', 'Increased Spell Damage', 'Maximum Energy Shield', 'Maximum Mana', 'Added Physical Damage', 'Custom modifier'],
   suffix: ['Fire Resistance', 'Cold Resistance', 'Lightning Resistance', 'Chaos Resistance', 'Attack Speed', 'Critical Strike Multiplier', 'Strength', 'Dexterity', 'Intelligence', 'Custom modifier']
 };
-function defaults() { return {v:1, side:'prefix', mods:[{name:'Maximum Life', rolls:[roll(100,109)], hit:false},{name:'Increased Physical Damage', rolls:[roll(150,169)], hit:false},{name:'Maximum Mana', rolls:[roll(50,59)], hit:false}], one:1, two:2, removal:0, initialCraft:0, specific:1}; }
+function defaults() {
+  const item = parseItem(EXAMPLE_ITEM);
+  return {v:1, side:'prefix', one:1, two:2, removal:0, ...structuredClone(item.banks.prefix), banks:item.banks, itemName:item.itemName, itemFlags:item.itemFlags, itemText:EXAMPLE_ITEM};
+}
 let state = defaults(), restoreNotice = '';
 function validState(s) {
   if (!s || s.v !== 1 || !['prefix','suffix'].includes(s.side)) throw new Error('Unsupported setup.');
+  if (s.itemText !== undefined && (typeof s.itemText !== 'string' || s.itemText.length > 50000)) throw new Error('Invalid item text.');
   probabilities(s.mods);
   for (const m of s.mods) if (typeof m.name !== 'string' || m.name.length > 120 || typeof m.hit !== 'boolean') throw new Error('Invalid modifier.');
   for (const m of s.mods) if (m.fractured !== undefined && typeof m.fractured !== 'boolean') throw new Error('Invalid fracture state.');
@@ -124,7 +128,7 @@ function importItem() {
     clearTimeout(timer);
     const item = parseItem($('item-paste').value);
     const side = item.banks[state.side].mods.length ? state.side : state.side === 'prefix' ? 'suffix' : 'prefix';
-    state = {...state,...structuredClone(item.banks[side]),side,banks:item.banks,itemName:item.itemName,itemFlags:item.itemFlags};
+    state = {...state,...structuredClone(item.banks[side]),side,banks:item.banks,itemName:item.itemName,itemFlags:item.itemFlags,itemText:$('item-paste').value};
     history.replaceState(null,'',location.pathname+location.search);
     $('import-status').className = 'import-success';
     $('import-status').textContent = `Imported ${item.banks.prefix.mods.length} prefixes and ${item.banks.suffix.mods.length} suffixes from ${item.itemName}. ${item.notes.join(' ')}`;
@@ -136,7 +140,7 @@ function importItem() {
 }
 $('import-item').addEventListener('click',importItem);
 $('item-paste').addEventListener('paste',()=>setTimeout(importItem,0));
-$('import-example').addEventListener('click',()=>{$('item-paste').value=EXAMPLE_ITEM;importItem();});
+$('import-example').addEventListener('click',loadDemo);
 $('can-craft').addEventListener('change',event=>{
   state.canCraft=event.target.checked;
   if (!state.canCraft) state.initialCraft=0;
@@ -179,7 +183,12 @@ for (const side of ['prefix','suffix']) $(side).addEventListener('click',()=>{
 $('add').addEventListener('click',()=>{if(state.mods.length<3){state.mods.push({name:'Custom modifier',rolls:[roll()],hit:false});renderMods();update();}});
 for (const key of ['one','two','removal']) $(key).addEventListener('input',event=>{state[key]=event.target.value === '' ? NaN : Number(event.target.value);update();});
 for (const [id,key] of [['current-craft','initialCraft'],['specific','specific']]) $(id).addEventListener('change',event=>{state[key]=Number(event.target.value);update();});
-$('reset').addEventListener('click',()=>{clearTimeout(timer);state=defaults();$('item-paste').value='';$('import-status').textContent='';history.replaceState(null,'',location.pathname+location.search);renderMods();update();});
+function loadDemo() {
+  clearTimeout(timer);state=defaults();$('item-paste').value=EXAMPLE_ITEM;
+  $('import-status').className='import-success';$('import-status').textContent='Loaded Oblivion Beak demo with its copied rolls. Mirrored is ignored for planning.';
+  history.replaceState(null,'',location.pathname+location.search);renderMods();update();
+}
+$('reset').addEventListener('click',loadDemo);
 $('share').addEventListener('click',async()=>{
   try {
     validState(state);
@@ -190,5 +199,6 @@ $('share').addEventListener('click',async()=>{
     $('save-status').textContent='Setup link copied';
   } catch { $('save-status').textContent = $('error').hidden ? 'Copy the setup link from the address bar' : 'Fix the inputs before sharing'; }
 });
+$('item-paste').value=state.itemText || '';
 renderMods(); update();
 if (restoreNotice) $('save-status').textContent=restoreNotice;

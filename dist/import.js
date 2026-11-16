@@ -110,26 +110,64 @@ export function atTarget(mod) {
   return mod.rolls.every(r => r.direction === 'atMost' ? r.current <= r.target + 1e-8 : r.direction === 'exact' ? Math.abs(r.current-r.target) < 1e-8 : r.current >= r.target - 1e-8);
 }
 
-export const EXAMPLE_ITEM = `Item Class: Body Armours
+export const EXAMPLE_ITEM = `Item Class: Two Hand Axes
 Rarity: Rare
-Storm Shelter
-Astral Plate
+Oblivion Beak
+Synthesised Despot Axe
 --------
-Armour: 1250
+Two Handed Axe
+Quality: +30% (augmented)
+Physical Damage: 972-1539 (augmented)
+Critical Strike Chance: 5.00%
+Attacks per Second: 2.45 (augmented)
+Weapon Range: 1.3 metres
 --------
-Item Level: 86
+Requirements:
+Level: 66
+Str: 140 (unmet)
+Dex: 86 (unmet)
 --------
-{ Implicit Modifier — Elemental, Resistance }
-+12(8-12)% to all Elemental Resistances (implicit)
+Sockets: W-W-W-W-W-W
 --------
-{ Prefix Modifier "Healthy" (Tier: 2) — Life }
-+104(100-109) to maximum Life
-{ Prefix Modifier "Stalwart" (Tier: 2) — Defences }
-120(110-120)% increased Armour
-{ Prefix Modifier "Hybrid" (Tier: 2) — Defences }
-39(39-42)% increased Armour
-16(16-17)% increased Stun and Block Recovery
-{ Suffix Modifier "of the Furnace" (Tier: 1) — Elemental, Fire, Resistance }
-+48(46-48)% to Fire Resistance
-{ Suffix Modifier "of the Titan" (Tier: 1) — Attribute }
-+52(51-55) to Strength`;
+Item Level: 87
+--------
+25% reduced Explicit Critical Modifier magnitudes (enchant)
+10% increased Explicit Physical Modifier magnitudes (enchant)
+--------
+{ Implicit Modifier — Damage, Physical, Attack }
+Adds 9(8-9) to 13(11-13) Physical Damage
+{ Implicit Modifier — Damage, Physical, Attack }
+25(23-25)% increased Physical Damage
+{ Implicit Modifier — Attack, Speed }
+8(7-8)% increased Attack Speed
+--------
+{ Prefix Modifier "Merciless" (Tier: 1) — Damage, Physical, Attack  — 25% Increased }
+178(170-179)% increased Physical Damage
+{ Prefix Modifier "Dictator's" (Tier: 1) — Damage, Physical, Attack  — 25% Increased }
+79(75-79)% increased Physical Damage
++184(175-200) to Accuracy Rating
+{ Prefix Modifier "Flaring" (Tier: 1) — Damage, Physical, Attack  — 25% Increased }
+Adds 47(34-47) to 84(72-84) Physical Damage
+{ Suffix Modifier "of the Order" (Tier: 1) — Damage }
+14(12-14)% chance to deal Double Damage
+{ Suffix Modifier "of Celebration" (Tier: 1) — Attack, Speed }
+27(26-27)% increased Attack Speed
+{ Master Crafted Suffix Modifier "of Craft" — Attack, Speed }
+22(20-22)% increased Attack Speed while a Rare or Unique Enemy is within 6 metres
+--------
+Mirrored
+--------
+{ Allocated Crucible Passive Skill (Tier: 5) }
+Adds 11 to 26 Physical Damage
+{ Allocated Crucible Passive Skill (Tier: 3) }
+40% increased Attack Speed
+20% less Global Damage
+{ Allocated Crucible Passive Skill (Tier: 2) }
+15% increased Explicit Physical and Chaos Damage Modifier magnitudes — Unscalable Value
+{ Allocated Crucible Passive Skill (Tier: 1) }
+Socketed Gems are Supported by Level 10 ​Fortify Support — Unscalable Value
+{ Allocated Crucible Passive Skill (Tier: 1) }
+Trigger Level 20 ​Bone Corpses when you Stun an Enemy with Heavy Strike or Boneshatter
+--------
+Synthesised Item
+--------`;
